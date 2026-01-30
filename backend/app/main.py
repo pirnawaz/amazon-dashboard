@@ -12,6 +12,7 @@ from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.dashboard_analytics import router as dashboard_analytics_router
 from app.api.routes.inventory import router as inventory_router
 from app.api.routes.forecast import router as forecast_router
+from app.api.routes.forecast_restock import router as forecast_restock_router
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -43,5 +44,6 @@ app.include_router(dashboard_router, prefix="/api")
 app.include_router(dashboard_analytics_router, prefix="/api")
 app.include_router(inventory_router, prefix="/api")
 app.include_router(forecast_router, prefix="/api")
+app.include_router(forecast_restock_router, prefix="/api")
 
 logger.info("Starting app in %s mode", settings.app_env)

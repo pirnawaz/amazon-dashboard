@@ -13,13 +13,18 @@ from app.models.marketplace import Marketplace
 from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.models.user import User
-from app.schemas.forecast import ForecastPoint, ForecastResponse
+from app.schemas.forecast import BacktestPoint, ForecastPoint, ForecastResponse
 from app.services.forecasting import (
     _series_from_points,
-    backtest_mae_30d,
+    backtest_30d,
     seasonal_naive_weekly,
 )
-from app.services.timeseries import get_daily_units_by_sku, get_daily_units_total
+from app.services.timeseries import (
+    get_data_end_date_sku,
+    get_data_end_date_total,
+    get_daily_units_by_sku,
+    get_daily_units_total,
+)
 
 router = APIRouter()
 
@@ -58,12 +63,15 @@ def forecast_total(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ForecastResponse:
-    end_date = date.today()
-    start_date = end_date - timedelta(days=history_days - 1)
     _validate_marketplace(db, marketplace)
+    end_date = get_data_end_date_total(db, marketplace)
+    if end_date is None:
+        end_date = date.today()
+    start_date = end_date - timedelta(days=history_days - 1)
 
     actual_list = get_daily_units_total(db, start_date, end_date, marketplace)
-    mae_30d = backtest_mae_30d(actual_list, use_seasonal_naive=True)
+    mae_30d, mape_30d, backtest_raw = backtest_30d(actual_list, use_seasonal_naive=True)
+    backtest_points = [BacktestPoint(**p) for p in backtest_raw]
 
     series = _series_from_points(actual_list)
     forecast_series = seasonal_naive_weekly(series, horizon_days)
@@ -77,6 +85,9 @@ def forecast_total(
         horizon_days=horizon_days,
         model_name=MODEL_NAME,
         mae_30d=round(mae_30d, 4),
+        data_end_date=end_date.isoformat(),
+        mape_30d=round(mape_30d, 4),
+        backtest_points=backtest_points,
         actual_points=_to_forecast_points(actual_list),
         forecast_points=forecast_list,
     )
@@ -91,12 +102,16 @@ def forecast_sku(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> ForecastResponse:
-    end_date = date.today()
-    start_date = end_date - timedelta(days=history_days - 1)
     _validate_marketplace(db, marketplace)
+    # Allow forecast if SKU exists in order_items even if not in products
+    end_date = get_data_end_date_sku(db, sku, marketplace)
+    if end_date is None:
+        raise HTTPException(status_code=404, detail="SKU not found")
+    start_date = end_date - timedelta(days=history_days - 1)
 
     actual_list = get_daily_units_by_sku(db, sku, start_date, end_date, marketplace)
-    mae_30d = backtest_mae_30d(actual_list, use_seasonal_naive=True)
+    mae_30d, mape_30d, backtest_raw = backtest_30d(actual_list, use_seasonal_naive=True)
+    backtest_points = [BacktestPoint(**p) for p in backtest_raw]
 
     series = _series_from_points(actual_list)
     forecast_series = seasonal_naive_weekly(series, horizon_days)
@@ -110,6 +125,9 @@ def forecast_sku(
         horizon_days=horizon_days,
         model_name=MODEL_NAME,
         mae_30d=round(mae_30d, 4),
+        data_end_date=end_date.isoformat(),
+        mape_30d=round(mape_30d, 4),
+        backtest_points=backtest_points,
         actual_points=_to_forecast_points(actual_list),
         forecast_points=forecast_list,
     )

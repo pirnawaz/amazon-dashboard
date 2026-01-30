@@ -72,6 +72,12 @@ export type ForecastPoint = {
   units: number;
 };
 
+export type BacktestPoint = {
+  date: string;
+  actual_units: number;
+  predicted_units: number;
+};
+
 export type ForecastResponse = {
   kind: "total" | "sku";
   sku: string | null;
@@ -80,8 +86,23 @@ export type ForecastResponse = {
   horizon_days: number;
   model_name: string;
   mae_30d: number;
+  data_end_date: string;
+  mape_30d: number;
+  backtest_points: BacktestPoint[];
   actual_points: ForecastPoint[];
   forecast_points: ForecastPoint[];
+};
+
+export type ForecastRestockPlanResponse = {
+  sku: string;
+  marketplace: string;
+  horizon_days: number;
+  lead_time_days: number;
+  service_level: number;
+  avg_daily_forecast_units: number;
+  forecast_units_lead_time: number;
+  safety_stock_units: number;
+  recommended_reorder_qty: number;
 };
 
 export type ForecastTopSkuRow = {
@@ -241,6 +262,31 @@ export async function forecastTopSkus(
     limit: String(params.limit),
   });
   return http<ForecastTopSkuRow[]>(`/api/forecast/top-skus?${sp}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function forecastRestockPlan(
+  token: string,
+  params: {
+    sku: string;
+    horizon_days?: number;
+    lead_time_days?: number;
+    service_level?: number;
+    marketplace?: string;
+  }
+): Promise<ForecastRestockPlanResponse> {
+  const sp = new URLSearchParams({
+    sku: params.sku,
+    horizon_days: String(params.horizon_days ?? 30),
+    lead_time_days: String(params.lead_time_days ?? 14),
+    service_level: String(params.service_level ?? 0.1),
+    marketplace: params.marketplace ?? "ALL",
+  });
+  return http<ForecastRestockPlanResponse>(`/api/forecast/restock-plan?${sp}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,

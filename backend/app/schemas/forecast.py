@@ -12,6 +12,13 @@ class ForecastPoint(BaseModel):
     units: int
 
 
+class BacktestPoint(BaseModel):
+    """Single backtest point: date, actual_units, predicted_units."""
+    date: str
+    actual_units: int
+    predicted_units: float
+
+
 class ForecastResponse(BaseModel):
     """Response for GET /forecast/total and GET /forecast/sku."""
     kind: Literal["total", "sku"]
@@ -21,5 +28,8 @@ class ForecastResponse(BaseModel):
     horizon_days: int
     model_name: str
     mae_30d: float
+    data_end_date: str
+    mape_30d: float
+    backtest_points: list[BacktestPoint]
     actual_points: list[ForecastPoint]
     forecast_points: list[ForecastPoint]
