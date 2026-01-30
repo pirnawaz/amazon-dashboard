@@ -39,4 +39,27 @@ docker-compose.yml
 - **DB:** user table via Alembic
 - **Frontend:** login screen + protected API call
 
-## How to run (coming in Sprint 1)
+## How to run (Sprint 1 - local, no Docker)
+
+**Prerequisites:** PostgreSQL running locally; repo-root `.env` with `DATABASE_URL` (e.g. `postgresql+psycopg://user:pass@localhost:5432/amazon_dashboard`), `JWT_SECRET`, and optionally `FRONTEND_ORIGIN=http://localhost:5173`.
+
+**Backend (PowerShell):**
+
+```powershell
+cd backend
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+alembic upgrade head
+uvicorn app.main:app --reload --port 8000
+```
+
+**Frontend (second terminal):**
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Frontend runs on port 5173. It proxies `/api` to the backend via `vite.config.ts`, so requests to `http://localhost:5173/api/...` are forwarded to `http://localhost:8000/api/...`.
