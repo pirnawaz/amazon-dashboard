@@ -3,18 +3,19 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import bcrypt
 from jose import jwt
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # bcrypt has a 72-byte limit; truncate to avoid ValueError with long passwords
+    raw = password.encode("utf-8")[:72]
+    return bcrypt.hashpw(raw, bcrypt.gensalt()).decode("utf-8")
 
 
 def verify_password(password: str, password_hash: str) -> bool:
-    return pwd_context.verify(password, password_hash)
+    raw = password.encode("utf-8")[:72]
+    return bcrypt.checkpw(raw, password_hash.encode("utf-8"))
 
 
 def create_access_token(*, subject: str, secret: str, algorithm: str, expires_minutes: int) -> str:
