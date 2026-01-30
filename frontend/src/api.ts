@@ -48,6 +48,25 @@ export type TopProductsResponse = {
   products: TopProductRow[];
 };
 
+export type RestockRow = {
+  sku: string;
+  title: string | null;
+  asin: string | null;
+  on_hand: number;
+  avg_daily_units: number;
+  days_of_cover: number;
+  reorder_qty: number;
+  risk_level: "CRITICAL" | "LOW" | "OK";
+};
+
+export type RestockResponse = {
+  days: number;
+  target_days: number;
+  marketplace: string;
+  limit: number;
+  items: RestockRow[];
+};
+
 async function http<T>(url: string, options: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...options,
@@ -129,6 +148,24 @@ export async function topProducts(
     limit: String(params.limit),
   });
   return http<TopProductsResponse>(`/api/dashboard/top-products?${sp}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function restock(
+  token: string,
+  params: { days: number; target_days: number; marketplace: string; limit: number }
+): Promise<RestockResponse> {
+  const sp = new URLSearchParams({
+    days: String(params.days),
+    target_days: String(params.target_days),
+    marketplace: params.marketplace,
+    limit: String(params.limit),
+  });
+  return http<RestockResponse>(`/api/inventory/restock?${sp}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,

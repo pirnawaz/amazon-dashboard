@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { login, me, register, type UserPublic } from "./api";
 import Dashboard from "./Dashboard";
+import Restock from "./Restock";
 
 export default function App() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -9,6 +10,7 @@ export default function App() {
 
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<UserPublic | null>(null);
+  const [tab, setTab] = useState<"dashboard" | "restock">("dashboard");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -65,12 +67,26 @@ export default function App() {
           <p>
             Logged in as <b>{user.email}</b>
           </p>
-          <button onClick={refreshMe} disabled={busy} style={{ marginRight: 8 }}>
-            Refresh /me
-          </button>
-          <button onClick={logout} disabled={busy}>
-            Logout
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+            <button
+              onClick={() => setTab("dashboard")}
+              style={{ fontWeight: tab === "dashboard" ? "bold" : "normal" }}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setTab("restock")}
+              style={{ fontWeight: tab === "restock" ? "bold" : "normal" }}
+            >
+              Restock
+            </button>
+            <button onClick={refreshMe} disabled={busy} style={{ marginLeft: 8 }}>
+              Refresh /me
+            </button>
+            <button onClick={logout} disabled={busy}>
+              Logout
+            </button>
+          </div>
 
           {error && (
             <pre style={{ background: "#fee", padding: 12, marginTop: 16, whiteSpace: "pre-wrap" }}>
@@ -78,7 +94,8 @@ export default function App() {
             </pre>
           )}
 
-          <Dashboard token={token} />
+          {tab === "dashboard" && <Dashboard token={token} />}
+          {tab === "restock" && <Restock token={token} />}
         </div>
       ) : (
         <div>
