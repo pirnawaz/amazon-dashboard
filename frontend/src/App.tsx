@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { login, me, register, type UserPublic } from "./api";
 import Dashboard from "./Dashboard";
 import Restock from "./Restock";
+import Forecast from "./Forecast";
 
 export default function App() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -10,7 +11,7 @@ export default function App() {
 
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<UserPublic | null>(null);
-  const [tab, setTab] = useState<"dashboard" | "restock">("dashboard");
+  const [tab, setTab] = useState<"dashboard" | "restock" | "forecast">("dashboard");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -80,6 +81,12 @@ export default function App() {
             >
               Restock
             </button>
+            <button
+              onClick={() => setTab("forecast")}
+              style={{ fontWeight: tab === "forecast" ? "bold" : "normal" }}
+            >
+              Forecast
+            </button>
             <button onClick={refreshMe} disabled={busy} style={{ marginLeft: 8 }}>
               Refresh /me
             </button>
@@ -96,6 +103,7 @@ export default function App() {
 
           {tab === "dashboard" && <Dashboard token={token} />}
           {tab === "restock" && <Restock token={token} />}
+          {tab === "forecast" && <Forecast token={token} />}
         </div>
       ) : (
         <div>

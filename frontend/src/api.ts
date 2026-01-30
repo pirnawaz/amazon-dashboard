@@ -67,6 +67,29 @@ export type RestockResponse = {
   items: RestockRow[];
 };
 
+export type ForecastPoint = {
+  date: string;
+  units: number;
+};
+
+export type ForecastResponse = {
+  kind: "total" | "sku";
+  sku: string | null;
+  marketplace: string;
+  history_days: number;
+  horizon_days: number;
+  model_name: string;
+  mae_30d: number;
+  actual_points: ForecastPoint[];
+  forecast_points: ForecastPoint[];
+};
+
+export type ForecastTopSkuRow = {
+  sku: string;
+  title: string;
+  revenue: number;
+};
+
 async function http<T>(url: string, options: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...options,
@@ -166,6 +189,58 @@ export async function restock(
     limit: String(params.limit),
   });
   return http<RestockResponse>(`/api/inventory/restock?${sp}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function forecastTotal(
+  token: string,
+  params: { history_days: number; horizon_days: number; marketplace: string }
+): Promise<ForecastResponse> {
+  const sp = new URLSearchParams({
+    history_days: String(params.history_days),
+    horizon_days: String(params.horizon_days),
+    marketplace: params.marketplace,
+  });
+  return http<ForecastResponse>(`/api/forecast/total?${sp}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function forecastSku(
+  token: string,
+  params: { sku: string; history_days: number; horizon_days: number; marketplace: string }
+): Promise<ForecastResponse> {
+  const sp = new URLSearchParams({
+    sku: params.sku,
+    history_days: String(params.history_days),
+    horizon_days: String(params.horizon_days),
+    marketplace: params.marketplace,
+  });
+  return http<ForecastResponse>(`/api/forecast/sku?${sp}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function forecastTopSkus(
+  token: string,
+  params: { days: number; marketplace: string; limit: number }
+): Promise<ForecastTopSkuRow[]> {
+  const sp = new URLSearchParams({
+    days: String(params.days),
+    marketplace: params.marketplace,
+    limit: String(params.limit),
+  });
+  return http<ForecastTopSkuRow[]>(`/api/forecast/top-skus?${sp}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
