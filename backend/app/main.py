@@ -9,6 +9,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.me import router as me_router
 from app.api.routes.dashboard import router as dashboard_router
+from app.api.routes.dashboard_analytics import router as dashboard_analytics_router
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -37,5 +38,6 @@ app.include_router(health_router, prefix="/api")
 app.include_router(auth_router, prefix="/api")
 app.include_router(me_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(dashboard_analytics_router, prefix="/api")
 
 logger.info("Starting app in %s mode", settings.app_env)

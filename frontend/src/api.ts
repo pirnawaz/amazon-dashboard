@@ -17,6 +17,37 @@ export type DashboardSummary = {
   net_profit_placeholder: number;
 };
 
+export type DashboardTimeseriesPoint = {
+  date: string;
+  revenue: number;
+  units: number;
+  orders: number;
+  ad_spend: number;
+  net_profit_placeholder: number;
+};
+
+export type DashboardTimeseriesResponse = {
+  days: number;
+  marketplace: string;
+  points: DashboardTimeseriesPoint[];
+};
+
+export type TopProductRow = {
+  sku: string;
+  title: string | null;
+  asin: string | null;
+  revenue: number;
+  units: number;
+  orders: number;
+};
+
+export type TopProductsResponse = {
+  days: number;
+  marketplace: string;
+  limit: number;
+  products: TopProductRow[];
+};
+
 async function http<T>(url: string, options: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...options,
@@ -65,6 +96,39 @@ export async function dashboardSummary(
     marketplace: params.marketplace,
   });
   return http<DashboardSummary>(`/api/dashboard/summary?${sp}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function timeseries(
+  token: string,
+  params: { days: number; marketplace: string }
+): Promise<DashboardTimeseriesResponse> {
+  const sp = new URLSearchParams({
+    days: String(params.days),
+    marketplace: params.marketplace,
+  });
+  return http<DashboardTimeseriesResponse>(`/api/dashboard/timeseries?${sp}`, {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function topProducts(
+  token: string,
+  params: { days: number; marketplace: string; limit: number }
+): Promise<TopProductsResponse> {
+  const sp = new URLSearchParams({
+    days: String(params.days),
+    marketplace: params.marketplace,
+    limit: String(params.limit),
+  });
+  return http<TopProductsResponse>(`/api/dashboard/top-products?${sp}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,
