@@ -9,6 +9,14 @@ export type UserPublic = {
   created_at: string;
 };
 
+export type DashboardSummary = {
+  revenue: number;
+  units: number;
+  orders: number;
+  ad_spend: number;
+  net_profit_placeholder: number;
+};
+
 async function http<T>(url: string, options: RequestInit): Promise<T> {
   const res = await fetch(url, {
     ...options,
@@ -41,6 +49,22 @@ export async function login(email: string, password: string): Promise<TokenRespo
 
 export async function me(token: string): Promise<UserPublic> {
   return http<UserPublic>("/api/me", {
+    method: "GET",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function dashboardSummary(
+  token: string,
+  params: { days: number; marketplace: string }
+): Promise<DashboardSummary> {
+  const sp = new URLSearchParams({
+    days: String(params.days),
+    marketplace: params.marketplace,
+  });
+  return http<DashboardSummary>(`/api/dashboard/summary?${sp}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${token}`,

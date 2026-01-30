@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { login, me, register, type UserPublic } from "./api";
+import Dashboard from "./Dashboard";
 
 export default function App() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -59,7 +60,7 @@ export default function App() {
     <div style={{ maxWidth: 520, margin: "40px auto", fontFamily: "system-ui, sans-serif" }}>
       <h1>Amazon Dashboard</h1>
 
-      {user ? (
+      {user && token ? (
         <div>
           <p>
             Logged in as <b>{user.email}</b>
@@ -76,6 +77,8 @@ export default function App() {
               {error}
             </pre>
           )}
+
+          <Dashboard token={token} />
         </div>
       ) : (
         <div>
