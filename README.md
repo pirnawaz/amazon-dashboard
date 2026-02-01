@@ -1,43 +1,53 @@
 # Amazon Dashboard (Seller + PPC + Forecasting)
 
-Production-ready Amazon Seller dashboard for two shared users on a single DigitalOcean droplet.
+Production-ready Amazon Seller dashboard for shared users on a single DigitalOcean droplet.
 
-## Tech stack (locked)
+## Tech stack
 
 - **Backend:** Python, FastAPI, SQLAlchemy, Alembic
 - **Database:** PostgreSQL
-- **Frontend:** React + TypeScript
+- **Frontend:** React + TypeScript, Vite, React Router
 - **Infra:** Docker, Docker Compose, Caddy
-- **Auth:** Email/password + JWT
+- **Auth:** Email/password + JWT; optional owner/partner roles
 - **Data/ML:** pandas, numpy, scikit-learn
 
 ## Features
 
-- Multi-marketplace support
-- Sales, profit, inventory, and PPC views
-- Forecasting and restock
-- Shared data for two users
-- Secure login
+- **Multi-marketplace** support
+- **Dashboard:** Sales, profit, inventory, top products, timeseries
+- **Forecasting:** Total and per-SKU demand; backtest, intelligence, restock plan
+- **Restock:** Restock table, actions (total + per-SKU), planner
+- **Inventory:** Levels by marketplace/SKU; create, update, delete
+- **Alerts:** Alert events (stale, urgent restock, reorder soon, order-by passed); acknowledge; **alert settings** (email toggles, recipients, stale threshold) — **owner only**
+- **Audit log:** Owner-only actions (alert settings changes, manual alert runs) — **owner only**
+- **Roles:** **Owner** (full access, alert settings, audit log, run alerts) and **Partner** (read/dashboard/forecast/restock/inventory/alerts; no settings or audit log)
+- **Demo mode:** Optional frontend-only demo data when `seller-hub-demo=true`
 
-## Development approach
-
-Mock data first; Amazon APIs later.
-
-## Planned repo structure
+## Repo structure
 
 ```
-backend/
-frontend/
-caddy/
-docker-compose.yml
+amazon-dashboard/
+  backend/          # FastAPI app, Alembic, models, services, worker
+  frontend/         # React + TypeScript (Vite)
+  caddy/            # Caddyfile (reverse proxy)
+  docker-compose.yml
+  docs/             # BACKUPS, DEPLOYMENT, FAQ, OPERATIONS
+  scripts/          # backup_db, deploy, restore_db, rollback
 ```
 
-## Sprint 1 scope
+## API overview
 
-- **Docker Compose services:** db, backend, frontend, caddy
-- **Backend endpoints:** `/api/health`, `/api/auth/register`, `/api/auth/login`, `/api/me`
-- **DB:** user table via Alembic
-- **Frontend:** login screen + protected API call
+- **Health:** `GET /api/health`
+- **Auth:** `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`, `GET /api/me`
+- **User:** `GET /api/me` (current user + role)
+- **Dashboard:** `GET /api/dashboard/summary`, `/api/dashboard/timeseries`, `/api/dashboard/top-products`
+- **Forecast:** `GET /api/forecast/total`, `GET /api/forecast/sku/:sku`, `GET /api/forecast/top-skus`, `GET /api/forecast/restock-plan`, `POST /api/restock/plan`
+- **Restock:** `GET /api/inventory/restock`, `GET /api/restock/actions/total`, `GET /api/restock/actions/sku/:sku`
+- **Inventory:** `GET /api/inventory`, `GET /api/inventory/:marketplace/:sku`, `PUT /api/inventory`, `DELETE /api/inventory/:marketplace/:sku`
+- **Alerts:** `GET /api/alerts`, `POST /api/alerts/ack`, `GET /api/alerts/settings`, `PUT /api/alerts/settings` (owner only), `POST /api/alerts/run` (owner only)
+- **Admin:** `GET /api/admin/audit-log?limit=50&offset=0` (owner only)
+
+Swagger docs at **http://localhost/docs** when running.
 
 ## How to run with Docker
 
@@ -49,11 +59,9 @@ copy .env.example .env
 docker compose up -d
 ```
 
-App is at **http://localhost** (Caddy on port 80; `/api` → backend, `/` → frontend). Swagger docs at **http://localhost/docs**. To stop: `docker compose down`.
+App at **http://localhost** (Caddy on port 80; `/api` → backend, `/` → frontend). To stop: `docker compose down`.
 
-### API / Restock Planner
-
-- **POST /api/restock/plan** — Accepts optional `current_inventory` (int, ≥0). When provided, the response includes `days_of_cover`, `expected_stockout_date`, and `stockout_before_lead_time`; otherwise these fields are null.
+Migrations run on backend startup. To run them manually (e.g. from host): use `backend/run_migration.ps1` or exec into the backend container and run `alembic upgrade head`.
 
 ## How to run (local, no Docker)
 
@@ -79,4 +87,11 @@ npm install
 npm run dev
 ```
 
-Frontend runs on the port configured in `vite.config.ts` (e.g. 5175). It proxies `/api` to the backend, so requests to `http://127.0.0.1:<port>/api/...` are forwarded to `http://127.0.0.1:8000/api/...`.
+Frontend runs on the port in `vite.config.ts` (e.g. 5175). It proxies `/api` to the backend.
+
+## Development
+
+- **Mock data first;** Amazon APIs later.
+- Frontend build: `cd frontend && npm run build`.
+
+For deployment, backups, and operations, see `docs/`.
