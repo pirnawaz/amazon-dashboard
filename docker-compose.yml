@@ -1,0 +1,53 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-amazon_dashboard}
+      POSTGRES_USER: ${POSTGRES_USER:-amazon_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-amazon_user} -d ${POSTGRES_DB:-amazon_dashboard}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-amazon_user}
+      POSTGRES_DB: ${POSTGRES_DB:-amazon_dashboard}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-amazon_user}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-amazon_dashboard}
+      APP_ENV: ${APP_ENV:-development}
+      JWT_SECRET: ${JWT_SECRET:-change_me_to_a_long_random_string}
+      FRONTEND_ORIGIN: http://localhost
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - backend
+      - frontend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

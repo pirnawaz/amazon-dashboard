@@ -1,19 +1,21 @@
 import { useMemo, useState } from "react";
-import { login, me, register, type UserPublic } from "./api";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import { ToastProvider } from "./context/ToastContext";
+import AppShell from "./layout/AppShell";
 import Dashboard from "./Dashboard";
 import Restock from "./Restock";
+import RestockPlanner from "./RestockPlanner";
 import Forecast from "./Forecast";
+import Settings from "./pages/Settings";
 
-export default function App() {
+function LoginRegisterForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<UserPublic | null>(null);
-  const [tab, setTab] = useState<"dashboard" | "restock" | "forecast">("dashboard");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const { login, register } = useAuth();
 
   const title = useMemo(() => (mode === "login" ? "Login" : "Register"), [mode]);
 
@@ -22,146 +24,185 @@ export default function App() {
     setError(null);
     setBusy(true);
     try {
-      const tok =
-        mode === "login"
-          ? await login(email, password)
-          : await register(email, password);
-
-      setToken(tok.access_token);
-
-      const u = await me(tok.access_token);
-      setUser(u);
-    } catch (err: any) {
-      setError(err?.message ?? "Something went wrong");
+      if (mode === "login") {
+        await login(email, password);
+      } else {
+        await register(email, password);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setBusy(false);
     }
-  }
-
-  async function refreshMe() {
-    if (!token) return;
-    setError(null);
-    setBusy(true);
-    try {
-      const u = await me(token);
-      setUser(u);
-    } catch (err: any) {
-      setError(err?.message ?? "Failed to load /me");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function logout() {
-    setToken(null);
-    setUser(null);
-    setPassword("");
-    setError(null);
   }
 
   return (
-    <div style={{ maxWidth: 520, margin: "40px auto", fontFamily: "system-ui, sans-serif" }}>
-      <h1>Amazon Dashboard</h1>
-
-      {user && token ? (
-        <div>
-          <p>
-            Logged in as <b>{user.email}</b>
-          </p>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-            <button
-              onClick={() => setTab("dashboard")}
-              style={{ fontWeight: tab === "dashboard" ? "bold" : "normal" }}
-            >
-              Dashboard
-            </button>
-            <button
-              onClick={() => setTab("restock")}
-              style={{ fontWeight: tab === "restock" ? "bold" : "normal" }}
-            >
-              Restock
-            </button>
-            <button
-              onClick={() => setTab("forecast")}
-              style={{ fontWeight: tab === "forecast" ? "bold" : "normal" }}
-            >
-              Forecast
-            </button>
-            <button onClick={refreshMe} disabled={busy} style={{ marginLeft: 8 }}>
-              Refresh /me
-            </button>
-            <button onClick={logout} disabled={busy}>
-              Logout
-            </button>
-          </div>
-
-          {error && (
-            <pre style={{ background: "#fee", padding: 12, marginTop: 16, whiteSpace: "pre-wrap" }}>
-              {error}
-            </pre>
-          )}
-
-          {tab === "dashboard" && <Dashboard token={token} />}
-          {tab === "restock" && <Restock token={token} />}
-          {tab === "forecast" && <Forecast token={token} />}
-        </div>
-      ) : (
-        <div>
-          <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-            <button
-              onClick={() => setMode("login")}
-              disabled={busy}
-              style={{ fontWeight: mode === "login" ? "bold" : "normal" }}
-            >
-              Login
-            </button>
-            <button
-              onClick={() => setMode("register")}
-              disabled={busy}
-              style={{ fontWeight: mode === "register" ? "bold" : "normal" }}
-            >
-              Register
-            </button>
-          </div>
-
-          <h2>{title}</h2>
-
-          <form onSubmit={onSubmit} style={{ display: "grid", gap: 12 }}>
-            <label>
-              Email
-              <input
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                type="email"
-                required
-                style={{ width: "100%", padding: 8, marginTop: 4 }}
-              />
-            </label>
-
-            <label>
-              Password (min 8 chars)
-              <input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                type="password"
-                required
-                minLength={8}
-                style={{ width: "100%", padding: 8, marginTop: 4 }}
-              />
-            </label>
-
-            <button type="submit" disabled={busy}>
-              {busy ? "Working..." : title}
-            </button>
-          </form>
-
-          {error && (
-            <pre style={{ background: "#fee", padding: 12, marginTop: 16, whiteSpace: "pre-wrap" }}>
-              {error}
-            </pre>
-          )}
-        </div>
+    <div
+      style={{
+        maxWidth: 520,
+        margin: "40px auto",
+        fontFamily: "var(--font-sans)",
+        padding: "var(--space-6)",
+      }}
+    >
+      <h1 style={{ marginBottom: "var(--space-4)" }}>Amazon Dashboard</h1>
+      <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
+        <button
+          onClick={() => setMode("login")}
+          disabled={busy}
+          style={{
+            fontWeight: mode === "login" ? "bold" : "normal",
+            padding: "var(--space-2) var(--space-4)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            backgroundColor: mode === "login" ? "var(--color-bg-muted)" : "transparent",
+          }}
+        >
+          Login
+        </button>
+        <button
+          onClick={() => setMode("register")}
+          disabled={busy}
+          style={{
+            fontWeight: mode === "register" ? "bold" : "normal",
+            padding: "var(--space-2) var(--space-4)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            backgroundColor: mode === "register" ? "var(--color-bg-muted)" : "transparent",
+          }}
+        >
+          Register
+        </button>
+      </div>
+      <h2>{title}</h2>
+      <form
+        onSubmit={onSubmit}
+        style={{
+          display: "grid",
+          gap: "var(--space-4)",
+          marginTop: "var(--space-4)",
+        }}
+      >
+        <label>
+          Email
+          <input
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            type="email"
+            required
+            style={{
+              width: "100%",
+              padding: "var(--space-3)",
+              marginTop: "var(--space-1)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-md)",
+            }}
+          />
+        </label>
+        <label>
+          Password (min 8 chars)
+          <input
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            type="password"
+            required
+            minLength={8}
+            style={{
+              width: "100%",
+              padding: "var(--space-3)",
+              marginTop: "var(--space-1)",
+              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius-md)",
+            }}
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={busy}
+          style={{
+            padding: "var(--space-3)",
+            backgroundColor: "var(--color-primary)",
+            color: "white",
+            border: "none",
+            borderRadius: "var(--radius-md)",
+            fontWeight: "var(--font-medium)",
+          }}
+        >
+          {busy ? "Working..." : title}
+        </button>
+      </form>
+      {error && (
+        <pre
+          style={{
+            background: "var(--color-error-muted)",
+            padding: "var(--space-4)",
+            marginTop: "var(--space-4)",
+            whiteSpace: "pre-wrap",
+            borderRadius: "var(--radius-md)",
+            color: "var(--color-error)",
+          }}
+        >
+          {error}
+        </pre>
       )}
     </div>
+  );
+}
+
+function AuthenticatedShell() {
+  const { token, user, logout } = useAuth();
+  if (!token || !user) return <Navigate to="/login" replace />;
+  return <AppShell userEmail={user.email} onLogout={logout} />;
+}
+
+function AppRoutes() {
+  const { token, user } = useAuth();
+
+  return (
+    <Routes>
+      <Route
+        path="/login"
+        element={
+          token && user ? <Navigate to="/dashboard" replace /> : <LoginRegisterForm />
+        }
+      />
+      <Route path="/" element={<AuthenticatedShell />}>
+        <Route index element={<Navigate to="/dashboard" replace />} />
+        <Route path="dashboard" element={<DashboardRoute />} />
+        <Route path="forecasts" element={<ForecastRoute />} />
+        <Route path="restock" element={<RestockRoute />} />
+        <Route path="restock/planner" element={<RestockPlannerRoute />} />
+        <Route path="settings" element={<Settings />} />
+      </Route>
+    </Routes>
+  );
+}
+
+function DashboardRoute() {
+  const { token } = useAuth();
+  return token ? <Dashboard token={token} /> : null;
+}
+function ForecastRoute() {
+  const { token } = useAuth();
+  return token ? <Forecast token={token} /> : null;
+}
+function RestockRoute() {
+  const { token } = useAuth();
+  return token ? <Restock token={token} /> : null;
+}
+function RestockPlannerRoute() {
+  const { token } = useAuth();
+  return token ? <RestockPlanner token={token} /> : null;
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AuthProvider>
+        <ToastProvider>
+          <AppRoutes />
+        </ToastProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

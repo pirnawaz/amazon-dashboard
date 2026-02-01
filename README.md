@@ -39,6 +39,22 @@ docker-compose.yml
 - **DB:** user table via Alembic
 - **Frontend:** login screen + protected API call
 
+## How to run with Docker
+
+**Prerequisites:** Copy `.env.example` to `.env` and set `JWT_SECRET` (and optionally change `POSTGRES_PASSWORD`).
+
+```powershell
+cd D:\Cursor\Amazon\amazon-dashboard
+copy .env.example .env
+docker compose up -d
+```
+
+App is at **http://localhost** (Caddy on port 80; `/api` → backend, `/` → frontend). Swagger docs at **http://localhost/docs**. To stop: `docker compose down`.
+
+### API / Restock Planner
+
+- **POST /api/restock/plan** — Accepts optional `current_inventory` (int, ≥0). When provided, the response includes `days_of_cover`, `expected_stockout_date`, and `stockout_before_lead_time`; otherwise these fields are null.
+
 ## How to run (local, no Docker)
 
 **Prerequisites:** PostgreSQL running locally; repo-root `.env` with `DATABASE_URL` (e.g. `postgresql+psycopg://user:pass@localhost:5432/amazon_dashboard`), `JWT_SECRET`, and optionally `FRONTEND_ORIGIN=http://localhost:5173`.

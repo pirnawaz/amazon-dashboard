@@ -105,6 +105,32 @@ export type ForecastRestockPlanResponse = {
   recommended_reorder_qty: number;
 };
 
+/** Request body for POST /api/restock/plan */
+export type RestockPlanRequest = {
+  sku: string;
+  marketplace: string;
+  lead_time_days: number;
+  service_level?: number;
+  current_inventory?: number;
+};
+
+/** Response from POST /api/restock/plan */
+export type RestockPlanResponse = {
+  sku: string;
+  marketplace: string;
+  lead_time_days: number;
+  service_level: number;
+  data_end_date: string;
+  avg_daily_demand: number;
+  lead_time_demand: number;
+  safety_stock: number;
+  reorder_quantity: number;
+  mape_30d: number;
+  days_of_cover?: number | null;
+  expected_stockout_date?: string | null;
+  stockout_before_lead_time?: boolean | null;
+};
+
 export type ForecastTopSkuRow = {
   sku: string;
   title: string;
@@ -122,7 +148,14 @@ async function http<T>(url: string, options: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || `Request failed: ${res.status}`);
+    try {
+      const j = JSON.parse(text) as { detail?: string; message?: string };
+      const msg = (j.detail ?? j.message ?? text) || `Request failed: ${res.status}`;
+      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+    } catch (e) {
+      if (e instanceof SyntaxError) throw new Error(text || `Request failed: ${res.status}`);
+      throw e;
+    }
   }
   return (await res.json()) as T;
 }
@@ -197,6 +230,12 @@ export async function topProducts(
       Authorization: `Bearer ${token}`,
     },
   });
+}
+
+/** Returns SKU strings from top products for the given marketplace (for suggestions). */
+export async function suggestedSkus(token: string, marketplace: string): Promise<string[]> {
+  const res = await topProducts(token, { days: 30, marketplace, limit: 50 });
+  return res.products.map((p) => p.sku);
 }
 
 export async function restock(
@@ -291,5 +330,24 @@ export async function forecastRestockPlan(
     headers: {
       Authorization: `Bearer ${token}`,
     },
+  });
+}
+
+export async function restockPlan(
+  token: string,
+  body: RestockPlanRequest
+): Promise<RestockPlanResponse> {
+  return http<RestockPlanResponse>("/api/restock/plan", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      sku: body.sku,
+      marketplace: body.marketplace,
+      lead_time_days: body.lead_time_days,
+      ...(body.service_level != null && { service_level: body.service_level }),
+      ...(body.current_inventory != null && { current_inventory: body.current_inventory }),
+    }),
   });
 }
