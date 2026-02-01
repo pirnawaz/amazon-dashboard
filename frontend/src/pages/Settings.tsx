@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import Card from "../components/ui/Card";
+import Tooltip from "../components/ui/Tooltip";
 import { useToast } from "../context/ToastContext";
 import {
   getPref,
@@ -10,6 +12,7 @@ import {
   DEFAULT_LEAD_TIME_DAYS_DEFAULT,
   DEFAULT_SERVICE_LEVEL_DEFAULT,
 } from "../utils/preferences";
+import { useDemo } from "../context/DemoContext";
 
 const MARKETPLACE_OPTIONS = ["ALL", "US", "UK", "DE", "FR", "IT", "ES"] as const;
 const HORIZON_OPTIONS = [30, 60] as const;
@@ -17,10 +20,12 @@ const SERVICE_LEVEL_OPTIONS = [0.85, 0.9, 0.95, 0.99] as const;
 
 export default function Settings() {
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [marketplace, setMarketplace] = useState<string>(DEFAULT_MARKETPLACE_DEFAULT);
   const [horizon, setHorizon] = useState<number>(DEFAULT_FORECAST_HORIZON_DEFAULT);
   const [leadTimeDays, setLeadTimeDays] = useState<number>(DEFAULT_LEAD_TIME_DAYS_DEFAULT);
   const [serviceLevel, setServiceLevel] = useState<number>(DEFAULT_SERVICE_LEVEL_DEFAULT);
+  const { isDemoMode: demoActive, clearDemoMode } = useDemo();
 
   useEffect(() => {
     setMarketplace(String(getPref(PREF_KEYS.DEFAULT_MARKETPLACE, DEFAULT_MARKETPLACE_DEFAULT)));
@@ -54,11 +59,110 @@ export default function Settings() {
     showToast("Default service level saved", "success");
   };
 
+  const handleClearDemo = () => {
+    clearDemoMode();
+    showToast("Demo mode cleared. You can now see real data on the Dashboard.", "success");
+    navigate("/dashboard", { replace: true });
+  };
+
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
       <h2 style={{ margin: 0, fontSize: "var(--text-2xl)", fontWeight: "var(--font-semibold)", color: "var(--color-text)" }}>
         Settings
       </h2>
+
+      <Card>
+        <div style={{ padding: "var(--space-6)" }}>
+          <h3
+            style={{
+              margin: "0 0 var(--space-4)",
+              fontSize: "var(--text-lg)",
+              fontWeight: "var(--font-semibold)",
+              color: "var(--color-text)",
+            }}
+          >
+            Amazon Connections
+          </h3>
+          <p style={{ margin: "0 0 var(--space-4)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
+            Connect your Amazon Seller Central account to sync orders, inventory, and ads. Not yet available.
+          </p>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "var(--space-4)",
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                padding: "var(--space-1) var(--space-2)",
+                backgroundColor: "var(--color-bg-muted)",
+                borderRadius: "var(--radius-sm)",
+                fontSize: "var(--text-sm)",
+                color: "var(--color-text-muted)",
+              }}
+            >
+              Status: {demoActive ? "Connected (mock)" : "Not connected"}
+            </span>
+            <Tooltip content="Coming soon — Amazon account linking is not available yet.">
+              <span style={{ display: "inline-block" }}>
+                <button
+                  type="button"
+                  disabled
+                  style={{
+                    padding: "var(--space-2) var(--space-4)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-md)",
+                    backgroundColor: "var(--color-bg-muted)",
+                    color: "var(--color-text-muted)",
+                    fontSize: "var(--text-sm)",
+                    cursor: "not-allowed",
+                  }}
+                >
+                  Connect Amazon account
+                </button>
+              </span>
+            </Tooltip>
+          </div>
+        </div>
+      </Card>
+
+      {demoActive && (
+        <Card>
+          <div style={{ padding: "var(--space-6)" }}>
+            <h3
+              style={{
+                margin: "0 0 var(--space-4)",
+                fontSize: "var(--text-lg)",
+                fontWeight: "var(--font-semibold)",
+                color: "var(--color-text)",
+              }}
+            >
+              Demo mode
+            </h3>
+            <p style={{ margin: "0 0 var(--space-4)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
+              Sample data is currently shown across the app. Clear it to use real data from your account.
+            </p>
+            <button
+              type="button"
+              onClick={handleClearDemo}
+              style={{
+                padding: "var(--space-2) var(--space-4)",
+                backgroundColor: "var(--color-bg-elevated)",
+                color: "var(--color-text)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                fontWeight: "var(--font-medium)",
+                cursor: "pointer",
+                fontSize: "var(--text-sm)",
+              }}
+            >
+              Clear demo data
+            </button>
+          </div>
+        </Card>
+      )}
 
       <Card>
         <div style={{ padding: "var(--space-6)" }}>

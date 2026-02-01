@@ -20,15 +20,33 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     breadcrumbs: [{ label: "Forecasts", path: "/forecasts" }],
   },
   "/restock": {
+    title: "Restock Actions",
+    description: "Restock actions from forecast intelligence: order-by date, reorder quantities, and recommendations.",
+    breadcrumbs: [{ label: "Restock Actions", path: "/restock" }],
+  },
+  "/alerts": {
+    title: "Alerts",
+    description: "In-app alerts and email notifications from inventory and restock logic.",
+    breadcrumbs: [{ label: "Alerts", path: "/alerts" }],
+  },
+  "/inventory": {
+    title: "Inventory",
+    description: "Inventory levels per SKU and marketplace; freshness and stale warnings.",
+    breadcrumbs: [{ label: "Inventory", path: "/inventory" }],
+  },
+  "/restock/inventory": {
     title: "Restock",
     description: "Inventory restock recommendations by risk level.",
-    breadcrumbs: [{ label: "Restock", path: "/restock" }],
+    breadcrumbs: [
+      { label: "Restock Actions", path: "/restock" },
+      { label: "Restock", path: "/restock/inventory" },
+    ],
   },
   "/restock/planner": {
     title: "Restock Planner",
     description: "Generate a reorder plan for a single SKU.",
     breadcrumbs: [
-      { label: "Restock", path: "/restock" },
+      { label: "Restock Actions", path: "/restock" },
       { label: "Planner", path: "/restock/planner" },
     ],
   },
@@ -36,6 +54,22 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     title: "Settings",
     description: "Account and application preferences.",
     breadcrumbs: [{ label: "Settings", path: "/settings" }],
+  },
+  "/settings/alerts": {
+    title: "Alert settings",
+    description: "Email notifications and alert thresholds (owner only).",
+    breadcrumbs: [
+      { label: "Settings", path: "/settings" },
+      { label: "Alert settings", path: "/settings/alerts" },
+    ],
+  },
+  "/admin/audit-log": {
+    title: "Audit log",
+    description: "Audit entries for owner-only actions.",
+    breadcrumbs: [
+      { label: "Admin", path: "/admin/audit-log" },
+      { label: "Audit log", path: "/admin/audit-log" },
+    ],
   },
 };
 

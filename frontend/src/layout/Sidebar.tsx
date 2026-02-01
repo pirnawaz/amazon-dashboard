@@ -1,19 +1,23 @@
 import { NavLink } from "react-router-dom";
+import type { UserRole } from "../api";
 
 type NavItem = { to: string; label: string };
 
-const SIDEBAR_GROUPS: { label: string; items: NavItem[] }[] = [
+const SIDEBAR_GROUPS_BASE: { label: string; items: NavItem[] }[] = [
   {
     label: "Insights",
     items: [
       { to: "/dashboard", label: "Dashboard" },
       { to: "/forecasts", label: "Forecasts" },
+      { to: "/restock", label: "Restock Actions" },
+      { to: "/alerts", label: "Alerts" },
     ],
   },
   {
     label: "Inventory",
     items: [
-      { to: "/restock", label: "Restock" },
+      { to: "/inventory", label: "Inventory" },
+      { to: "/restock/inventory", label: "Restock" },
       { to: "/restock/planner", label: "Restock Planner" },
     ],
   },
@@ -23,11 +27,31 @@ const SIDEBAR_GROUPS: { label: string; items: NavItem[] }[] = [
   },
 ];
 
+const SIDEBAR_OWNER_ITEMS: NavItem[] = [
+  { to: "/settings/alerts", label: "Alert settings" },
+];
+
+const SIDEBAR_ADMIN_ITEMS: NavItem[] = [{ to: "/admin/audit-log", label: "Audit log" }];
+
+function buildSidebarGroups(userRole: UserRole | undefined): { label: string; items: NavItem[] }[] {
+  const isOwner = userRole === "owner";
+  if (!isOwner) return SIDEBAR_GROUPS_BASE;
+  return [
+    ...SIDEBAR_GROUPS_BASE.map((g) =>
+      g.label === "Settings"
+        ? { label: g.label, items: [...g.items, ...SIDEBAR_OWNER_ITEMS] }
+        : g
+    ),
+    { label: "Admin", items: SIDEBAR_ADMIN_ITEMS },
+  ];
+}
+
 type Props = {
   open?: boolean;
   onClose?: () => void;
   collapsed?: boolean;
   onCollapsedChange?: (collapsed: boolean) => void;
+  userRole?: UserRole;
 };
 
 export default function Sidebar({
@@ -35,7 +59,9 @@ export default function Sidebar({
   onClose,
   collapsed = false,
   onCollapsedChange,
+  userRole,
 }: Props) {
+  const sidebarGroups = buildSidebarGroups(userRole);
   return (
     <>
       <aside
@@ -83,7 +109,7 @@ export default function Sidebar({
           }}
           aria-label="Main navigation"
         >
-          {SIDEBAR_GROUPS.map((group) => (
+          {sidebarGroups.map((group) => (
             <div key={group.label} style={{ marginBottom: "var(--space-4)" }}>
               {!collapsed && (
                 <div

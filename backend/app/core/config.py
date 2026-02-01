@@ -19,9 +19,18 @@ def _require(name: str) -> str:
     return val
 
 
+def _app_env() -> str:
+    val = os.getenv("APP_ENV", "development").strip().lower()
+    if val not in ("development", "production"):
+        raise RuntimeError(
+            f"Invalid APP_ENV: {val}. Must be 'development' or 'production'."
+        )
+    return val
+
+
 @dataclass(frozen=True)
 class Settings:
-    app_env: str = os.getenv("APP_ENV", "development")
+    app_env: str = _app_env()
 
     database_url: str = _require("DATABASE_URL")
 
@@ -30,6 +39,20 @@ class Settings:
     jwt_expires_minutes: int = int(os.getenv("JWT_EXPIRES_MINUTES", "60"))
 
     frontend_origin: str = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
+
+    # Rate limiting: requests per minute per IP (and per user when JWT present)
+    rate_limit_per_minute: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "100"))
+
+    # Optional: SMTP for alert emails (Phase 7B)
+    smtp_host: str | None = os.getenv("SMTP_HOST") or None
+    smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user: str | None = os.getenv("SMTP_USER") or None
+    smtp_pass: str | None = os.getenv("SMTP_PASS") or None
+    smtp_from: str | None = os.getenv("SMTP_FROM") or None
+    smtp_tls: bool = (os.getenv("SMTP_TLS", "true").strip().lower() in ("true", "1", "yes"))
+
+    # Alerts worker: interval in seconds (default 15 minutes)
+    alerts_interval_seconds: int = int(os.getenv("ALERTS_INTERVAL_SECONDS", "900"))
 
 
 settings = Settings()

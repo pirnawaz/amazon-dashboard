@@ -1,13 +1,22 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
+import { DemoProvider } from "./context/DemoContext";
 import AppShell from "./layout/AppShell";
 import Dashboard from "./Dashboard";
 import Restock from "./Restock";
 import RestockPlanner from "./RestockPlanner";
+import RestockActions from "./RestockActions";
 import Forecast from "./Forecast";
+import Inventory from "./Inventory";
+import Alerts from "./Alerts";
+import RequireOwner from "./components/auth/RequireOwner";
 import Settings from "./pages/Settings";
+import AlertSettings from "./pages/AlertSettings";
+import AuditLog from "./pages/AuditLog";
+
+const SESSION_EXPIRED_KEY = "seller-hub-session-expired";
 
 function LoginRegisterForm() {
   const [mode, setMode] = useState<"login" | "register">("login");
@@ -15,7 +24,19 @@ function LoginRegisterForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const { login, register } = useAuth();
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(SESSION_EXPIRED_KEY) === "1") {
+        sessionStorage.removeItem(SESSION_EXPIRED_KEY);
+        setSessionExpired(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const title = useMemo(() => (mode === "login" ? "Login" : "Register"), [mode]);
 
@@ -45,7 +66,21 @@ function LoginRegisterForm() {
         padding: "var(--space-6)",
       }}
     >
-      <h1 style={{ marginBottom: "var(--space-4)" }}>Amazon Dashboard</h1>
+      <h1 style={{ marginBottom: "var(--space-4)" }}>Seller Hub</h1>
+      {sessionExpired && (
+        <p
+          style={{
+            marginBottom: "var(--space-4)",
+            padding: "var(--space-3) var(--space-4)",
+            backgroundColor: "var(--color-warning-muted)",
+            color: "var(--color-warning)",
+            borderRadius: "var(--radius-md)",
+            fontSize: "var(--text-sm)",
+          }}
+        >
+          Your session expired. Please log in again.
+        </p>
+      )}
       <div style={{ display: "flex", gap: "var(--space-2)", marginBottom: "var(--space-4)" }}>
         <button
           onClick={() => setMode("login")}
@@ -150,29 +185,80 @@ function LoginRegisterForm() {
 }
 
 function AuthenticatedShell() {
-  const { token, user, logout } = useAuth();
+  const { token, user, logout, isRestoring } = useAuth();
+  if (isRestoring) {
+    return (
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          minHeight: "100vh",
+          fontFamily: "var(--font-sans)",
+        }}
+      >
+        Loading…
+      </div>
+    );
+  }
   if (!token || !user) return <Navigate to="/login" replace />;
-  return <AppShell userEmail={user.email} onLogout={logout} />;
+  return <AppShell userEmail={user.email} userRole={user.role} onLogout={logout} />;
 }
 
 function AppRoutes() {
-  const { token, user } = useAuth();
+  const { token, user, isRestoring } = useAuth();
 
   return (
     <Routes>
       <Route
         path="/login"
         element={
-          token && user ? <Navigate to="/dashboard" replace /> : <LoginRegisterForm />
+          isRestoring ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                minHeight: "100vh",
+                fontFamily: "var(--font-sans)",
+              }}
+            >
+              Loading…
+            </div>
+          ) : token && user ? (
+            <Navigate to="/dashboard" replace />
+          ) : (
+            <LoginRegisterForm />
+          )
         }
       />
       <Route path="/" element={<AuthenticatedShell />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardRoute />} />
         <Route path="forecasts" element={<ForecastRoute />} />
-        <Route path="restock" element={<RestockRoute />} />
+        <Route path="inventory" element={<InventoryRoute />} />
+        <Route path="restock" element={<RestockActionsRoute />} />
+        <Route path="restock/actions" element={<Navigate to="/restock" replace />} />
+        <Route path="restock/inventory" element={<RestockRoute />} />
         <Route path="restock/planner" element={<RestockPlannerRoute />} />
+        <Route path="alerts" element={<AlertsRoute />} />
         <Route path="settings" element={<Settings />} />
+        <Route
+          path="settings/alerts"
+          element={
+            <RequireOwner>
+              <AlertSettingsRoute />
+            </RequireOwner>
+          }
+        />
+        <Route
+          path="admin/audit-log"
+          element={
+            <RequireOwner>
+              <AuditLog />
+            </RequireOwner>
+          }
+        />
       </Route>
     </Routes>
   );
@@ -190,9 +276,25 @@ function RestockRoute() {
   const { token } = useAuth();
   return token ? <Restock token={token} /> : null;
 }
+function RestockActionsRoute() {
+  const { token } = useAuth();
+  return token ? <RestockActions token={token} /> : null;
+}
 function RestockPlannerRoute() {
   const { token } = useAuth();
   return token ? <RestockPlanner token={token} /> : null;
+}
+function InventoryRoute() {
+  const { token } = useAuth();
+  return token ? <Inventory token={token} /> : null;
+}
+function AlertsRoute() {
+  const { token } = useAuth();
+  return token ? <Alerts token={token} /> : null;
+}
+function AlertSettingsRoute() {
+  const { token } = useAuth();
+  return token ? <AlertSettings /> : null;
 }
 
 export default function App() {
@@ -200,7 +302,9 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <ToastProvider>
-          <AppRoutes />
+          <DemoProvider>
+            <AppRoutes />
+          </DemoProvider>
         </ToastProvider>
       </AuthProvider>
     </BrowserRouter>

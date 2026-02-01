@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { restockPlan, suggestedSkus, type RestockPlanResponse } from "./api";
+import { getDemoSuggestedSkus, getDemoRestockPlan } from "./data/demoData";
 import { useToast } from "./context/ToastContext";
 import EmptyState from "./components/ui/EmptyState";
 import Card from "./components/ui/Card";
@@ -12,6 +13,7 @@ import {
   DEFAULT_LEAD_TIME_DAYS_DEFAULT,
   DEFAULT_SERVICE_LEVEL_DEFAULT,
 } from "./utils/preferences";
+import { isDemoMode } from "./utils/preferences";
 
 const MARKETPLACE_OPTIONS = ["US", "UK", "DE", "FR", "IT", "ES"] as const;
 const SERVICE_LEVEL_OPTIONS = [
@@ -79,6 +81,12 @@ export default function RestockPlanner({ token }: Props) {
   const { showToast } = useToast();
 
   useEffect(() => {
+    if (isDemoMode()) {
+      setSuggestedSkusList(getDemoSuggestedSkus(marketplace));
+      setSuggestionsError(null);
+      setLoadingSuggestions(false);
+      return;
+    }
     if (!hasToken) {
       setSuggestedSkusList([]);
       setSuggestionsError(null);
@@ -94,7 +102,7 @@ export default function RestockPlanner({ token }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!hasToken) return;
+    if (!hasToken && !isDemoMode()) return;
     setError(null);
     setResult(null);
     setLoading(true);
@@ -104,6 +112,21 @@ export default function RestockPlanner({ token }: Props) {
       invTrimmed === "" ? undefined : Math.max(0, Math.floor(Number.isNaN(raw) ? 0 : raw));
     const sentWithInventory = currentInventory !== undefined;
     try {
+      if (isDemoMode()) {
+        const data = getDemoRestockPlan({
+          sku: sku.trim(),
+          marketplace,
+          lead_time_days: leadTimeDays,
+          service_level: serviceLevel,
+          current_inventory: currentInventory,
+        });
+        setResult(data);
+        setLastSubmittedWithInventory(sentWithInventory);
+        setLastSubmittedInventory(sentWithInventory && currentInventory !== undefined ? currentInventory : null);
+        showToast("Plan generated (demo)", "success");
+        setLoading(false);
+        return;
+      }
       const body = {
         sku: sku.trim(),
         marketplace,
@@ -163,16 +186,31 @@ export default function RestockPlanner({ token }: Props) {
     });
   }
 
-  const formDisabled = !hasToken;
+  const formDisabled = !hasToken && !isDemoMode();
 
   return (
     <section style={{ marginTop: 24 }}>
       <h2>Restock Planner</h2>
 
-      {!hasToken && (
-        <p style={{ background: "#fef3c7", padding: 12, borderRadius: 8, marginBottom: 16 }}>
-          Please log in to generate a restock plan.
+      {!hasToken && !isDemoMode() && (
+        <p style={{ background: "var(--color-warning-muted)", padding: 12, borderRadius: 8, marginBottom: 16, color: "var(--color-warning)" }}>
+          Please log in to generate a restock plan, or load sample data from the Dashboard to try the Planner with demo SKUs.
         </p>
+      )}
+      {isDemoMode() && (
+        <div
+          style={{
+            padding: "var(--space-2) var(--space-4)",
+            backgroundColor: "var(--color-warning-muted)",
+            color: "var(--color-warning)",
+            borderRadius: "var(--radius-md)",
+            fontSize: "var(--text-sm)",
+            fontWeight: "var(--font-medium)",
+            marginBottom: 16,
+          }}
+        >
+          Demo data — use demo SKUs (e.g. DEMO-SKU-001) to generate a sample plan. Clear in Settings to use real data.
+        </div>
       )}
 
       <form
@@ -213,8 +251,8 @@ export default function RestockPlanner({ token }: Props) {
               </span>
             )}
             {!loadingSuggestions && !suggestionsError && suggestedSkusList.length === 0 && (
-              <span style={{ display: "block", fontSize: 13, color: "#666", marginTop: 4 }}>
-                No suggestions available
+              <span style={{ display: "block", fontSize: 13, color: "var(--color-text-muted)", marginTop: 4 }}>
+                No suggestions available. Load sample data from the Dashboard or connect your Amazon account in Settings.
               </span>
             )}
             {!loadingSuggestions && suggestedSkusList.length > 0 && (

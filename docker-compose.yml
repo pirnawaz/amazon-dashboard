@@ -29,6 +29,34 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  alerts_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-amazon_user}
+      POSTGRES_DB: ${POSTGRES_DB:-amazon_dashboard}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-amazon_user}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-amazon_dashboard}
+      ALERTS_INTERVAL_SECONDS: ${ALERTS_INTERVAL_SECONDS:-900}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_TLS: ${SMTP_TLS:-true}
+    command: ["python -m app.worker.alerts_worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always
 
   frontend:
     build:

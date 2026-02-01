@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -17,14 +17,22 @@ import {
   type TopProductsResponse,
   type TopProductRow,
 } from "./api";
+import {
+  getDemoDashboardSummary,
+  getDemoTimeseries,
+  getDemoTopProducts,
+} from "./data/demoData";
 import Card from "./components/ui/Card";
 import Metric from "./components/ui/Metric";
 import Table from "./components/ui/Table";
 import ChartContainer from "./components/ui/ChartContainer";
 import EmptyState from "./components/ui/EmptyState";
 import LoadingSkeleton from "./components/ui/LoadingSkeleton";
+import OnboardingCard from "./components/onboarding/OnboardingCard";
 import { formatCurrency, formatShortDate, formatInteger } from "./utils/format";
 import { rolling7dComparison } from "./utils/insights";
+import { useDemo } from "./context/DemoContext";
+import { isOnboarded } from "./utils/preferences";
 
 const DAYS_OPTIONS = [7, 30, 90] as const;
 const MARKETPLACE_OPTIONS = ["ALL", "US", "UK", "DE"] as const;
@@ -42,6 +50,7 @@ const TOP_PRODUCTS_COLUMNS = [
 ];
 
 export default function Dashboard({ token }: Props) {
+  const { isDemoMode: demoMode, setDemoMode: setDemoModeContext } = useDemo();
   const [days, setDays] = useState<number>(30);
   const [marketplace, setMarketplace] = useState<string>("ALL");
   const [summary, setSummary] = useState<DashboardSummaryType | null>(null);
@@ -50,10 +59,19 @@ export default function Dashboard({ token }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadData = useCallback(() => {
+    const params = { days, marketplace };
+    if (demoMode) {
+      setError(null);
+      setLoading(true);
+      setSummary(getDemoDashboardSummary());
+      setTimeseriesData(getDemoTimeseries(params));
+      setTopProductsData(getDemoTopProducts({ ...params, limit: 10 }));
+      setLoading(false);
+      return;
+    }
     setError(null);
     setLoading(true);
-    const params = { days, marketplace };
     Promise.all([
       dashboardSummary(token, params),
       timeseries(token, params),
@@ -68,7 +86,11 @@ export default function Dashboard({ token }: Props) {
         setError(err instanceof Error ? err.message : "Failed to load dashboard")
       )
       .finally(() => setLoading(false));
-  }, [token, days, marketplace]);
+  }, [token, days, marketplace, demoMode]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const chartData =
     timeseriesData?.points.map((p) => ({
@@ -87,47 +109,40 @@ export default function Dashboard({ token }: Props) {
 
   if (error) {
     return (
-      <Card>
-        <EmptyState
-          title="Something went wrong"
-          description={error}
-          action={
-            <button
-              type="button"
-              onClick={() => {
-                setError(null);
-                setLoading(true);
-                const params = { days, marketplace };
-                Promise.all([
-                  dashboardSummary(token, params),
-                  timeseries(token, params),
-                  topProducts(token, { ...params, limit: 10 }),
-                ])
-                  .then(([s, t, p]) => {
-                    setSummary(s);
-                    setTimeseriesData(t);
-                    setTopProductsData(p);
-                  })
-                  .catch((err: unknown) =>
-                    setError(err instanceof Error ? err.message : "Failed to load dashboard")
-                  )
-                  .finally(() => setLoading(false));
-              }}
-              style={{
-                padding: "var(--space-2) var(--space-4)",
-                backgroundColor: "var(--color-primary)",
-                color: "white",
-                border: "none",
-                borderRadius: "var(--radius-md)",
-                fontWeight: "var(--font-medium)",
-                cursor: "pointer",
-              }}
-            >
-              Try again
-            </button>
-          }
-        />
-      </Card>
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+        {!isOnboarded() && (
+          <OnboardingCard
+            onLoadSampleData={() => {
+              setError(null);
+              loadData();
+            }}
+            onDismiss={() => setError(null)}
+          />
+        )}
+        <Card>
+          <EmptyState
+            title="Something went wrong"
+            description={error}
+            action={
+              <button
+                type="button"
+                onClick={() => loadData()}
+                style={{
+                  padding: "var(--space-2) var(--space-4)",
+                  backgroundColor: "var(--color-primary)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "var(--radius-md)",
+                  fontWeight: "var(--font-medium)",
+                  cursor: "pointer",
+                }}
+              >
+                Try again
+              </button>
+            }
+          />
+        </Card>
+      </div>
     );
   }
 
@@ -165,15 +180,78 @@ export default function Dashboard({ token }: Props) {
 
   if (summary === null) {
     return (
-      <EmptyState
-        title="No dashboard data"
-        description="Unable to load dashboard summary. Please try again later."
-      />
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+        {!isOnboarded() && (
+          <OnboardingCard
+            onLoadSampleData={() => loadData()}
+            onDismiss={() => loadData()}
+          />
+        )}
+        <EmptyState
+          title="No dashboard data"
+          description="Unable to load dashboard summary. Try again later, or load sample data to explore the app."
+          action={
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)", justifyContent: "center" }}>
+              <button
+                type="button"
+                onClick={() => loadData()}
+                style={{
+                  padding: "var(--space-2) var(--space-4)",
+                  backgroundColor: "var(--color-primary)",
+                  color: "white",
+                  border: "none",
+                  borderRadius: "var(--radius-md)",
+                  fontWeight: "var(--font-medium)",
+                  cursor: "pointer",
+                }}
+              >
+                Try again
+              </button>
+              {!demoMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDemoModeContext();
+                    loadData();
+                  }}
+                  style={{
+                    padding: "var(--space-2) var(--space-4)",
+                    border: "1px solid var(--color-border)",
+                    borderRadius: "var(--radius-md)",
+                    backgroundColor: "var(--color-bg-elevated)",
+                    fontWeight: "var(--font-medium)",
+                    cursor: "pointer",
+                  }}
+                >
+                  Load sample data
+                </button>
+              )}
+            </div>
+          }
+        />
+      </div>
     );
   }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+        {!isOnboarded() && (
+          <OnboardingCard onLoadSampleData={loadData} onDismiss={() => {}} />
+        )}
+      {demoMode && (
+        <div
+          style={{
+            padding: "var(--space-2) var(--space-4)",
+            backgroundColor: "var(--color-warning-muted)",
+            color: "var(--color-warning)",
+            borderRadius: "var(--radius-md)",
+            fontSize: "var(--text-sm)",
+            fontWeight: "var(--font-medium)",
+          }}
+        >
+          Demo data — sample metrics and charts for exploration. Clear in Settings to use real data.
+        </div>
+      )}
       {/* Filters */}
       <div
         style={{
@@ -410,7 +488,7 @@ export default function Dashboard({ token }: Props) {
         <ChartContainer title="Charts">
           <EmptyState
             title="No time series data"
-            description="No chart data available for the selected period and marketplace."
+            description="No chart data available for the selected period and marketplace. Try loading sample data from the welcome card, connecting your Amazon account in Settings, or adjusting the marketplace filter."
           />
         </ChartContainer>
       )}
@@ -434,7 +512,7 @@ export default function Dashboard({ token }: Props) {
           data={topProductsData?.products ?? []}
           getRowKey={(r) => r.sku}
           emptyTitle="No top products"
-          emptyDescription="No top products for the selected period."
+          emptyDescription="No top products for the selected period. Load sample data from the Dashboard welcome card, connect Amazon in Settings, or try a different marketplace."
           stickyHeader
         />
       </Card>

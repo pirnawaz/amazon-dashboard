@@ -21,6 +21,7 @@ type Props = {
   description?: string;
   breadcrumbs?: Breadcrumb[];
   userEmail?: string;
+  userRole?: "owner" | "partner";
   onLogout?: () => void;
   onMenuClick?: () => void;
 };
@@ -30,6 +31,7 @@ export default function Header({
   description,
   breadcrumbs = [],
   userEmail,
+  userRole,
   onLogout,
   onMenuClick,
 }: Props) {
@@ -203,6 +205,18 @@ export default function Header({
                     }}
                   >
                     {userEmail ?? "—"}
+                    {userRole != null && (
+                      <span
+                        style={{
+                          display: "block",
+                          fontSize: "var(--text-xs)",
+                          textTransform: "capitalize",
+                          marginTop: "var(--space-1)",
+                        }}
+                      >
+                        {userRole}
+                      </span>
+                    )}
                   </div>
                   <button
                     type="button"

@@ -18,14 +18,28 @@ import {
   type ForecastTopSkuRow,
   type ForecastRestockPlanResponse,
 } from "./api";
+import {
+  getDemoForecastTotal,
+  getDemoForecastSku,
+  getDemoForecastTopSkus,
+  getDemoForecastRestockPlan,
+} from "./data/demoData";
 import ChartContainer from "./components/ui/ChartContainer";
 import EmptyState from "./components/ui/EmptyState";
 import LoadingSkeleton from "./components/ui/LoadingSkeleton";
 import Card from "./components/ui/Card";
 import Tooltip from "./components/ui/Tooltip";
 import ForecastQualityBadge from "./components/insights/ForecastQualityBadge";
+import ForecastSummaryCard from "./components/forecast/ForecastSummaryCard";
+import ForecastTable, { type ForecastTableRow } from "./components/forecast/ForecastTable";
 import { formatShortDate, formatPercent, formatDecimal } from "./utils/format";
-import { getPref, PREF_KEYS, DEFAULT_FORECAST_HORIZON_DEFAULT, DEFAULT_MARKETPLACE_DEFAULT } from "./utils/preferences";
+import {
+  getPref,
+  PREF_KEYS,
+  DEFAULT_FORECAST_HORIZON_DEFAULT,
+  DEFAULT_MARKETPLACE_DEFAULT,
+} from "./utils/preferences";
+import { isDemoMode } from "./utils/preferences";
 
 const MARKETPLACE_OPTIONS = ["ALL", "US", "UK", "DE"] as const;
 const HORIZON_OPTIONS = [14, 30, 60] as const;
@@ -37,8 +51,10 @@ type Props = {
   token: string;
 };
 
-const MAE_DESC = "Mean Absolute Error: average difference between predicted and actual units over the last 30 days. Lower is better.";
-const MAPE_DESC = "Mean Absolute Percentage Error: average percentage difference between predicted and actual units. Lower is better.";
+const MAE_DESC =
+  "Mean Absolute Error: average difference between predicted and actual units over the last 30 days. Lower is better.";
+const MAPE_DESC =
+  "Mean Absolute Percentage Error: average percentage difference between predicted and actual units. Lower is better.";
 
 export default function Forecast({ token }: Props) {
   const [mode, setMode] = useState<"total" | "sku">("total");
@@ -46,8 +62,12 @@ export default function Forecast({ token }: Props) {
     String(getPref(PREF_KEYS.DEFAULT_MARKETPLACE, DEFAULT_MARKETPLACE_DEFAULT))
   );
   const [horizonDays, setHorizonDays] = useState<number>(() => {
-    const h = Number(getPref(PREF_KEYS.DEFAULT_FORECAST_HORIZON, DEFAULT_FORECAST_HORIZON_DEFAULT));
-    return HORIZON_OPTIONS.includes(h as (typeof HORIZON_OPTIONS)[number]) ? h : DEFAULT_FORECAST_HORIZON_DEFAULT;
+    const h = Number(
+      getPref(PREF_KEYS.DEFAULT_FORECAST_HORIZON, DEFAULT_FORECAST_HORIZON_DEFAULT)
+    );
+    return HORIZON_OPTIONS.includes(h as (typeof HORIZON_OPTIONS)[number])
+      ? h
+      : DEFAULT_FORECAST_HORIZON_DEFAULT;
   });
   const [skuSelect, setSkuSelect] = useState<string>("");
   const [skuManual, setSkuManual] = useState<string>("");
@@ -58,12 +78,13 @@ export default function Forecast({ token }: Props) {
   const [serviceLevel, setServiceLevel] = useState<number>(0.1);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showCharts, setShowCharts] = useState(false);
 
   const effectiveSku = mode === "sku" ? (skuSelect || skuManual).trim() : "";
 
   const loadForecast = () => {
-    if (!token) return;
-    if (mode === "sku" && !effectiveSku) {
+    if (!token && !isDemoMode()) return;
+    if (mode === "sku" && !effectiveSku && !isDemoMode()) {
       setData(null);
       return;
     }
@@ -75,10 +96,19 @@ export default function Forecast({ token }: Props) {
       horizon_days: horizonDays,
       marketplace,
     };
+    if (isDemoMode()) {
+      const demoData =
+        mode === "total"
+          ? getDemoForecastTotal(params)
+          : getDemoForecastSku({ ...params, sku: effectiveSku || "DEMO-SKU-001" });
+      setData(demoData);
+      setLoading(false);
+      return;
+    }
     const req =
       mode === "total"
-        ? forecastTotal(token, params)
-        : forecastSku(token, { ...params, sku: effectiveSku });
+        ? forecastTotal(token!, params)
+        : forecastSku(token!, { ...params, sku: effectiveSku });
     req
       .then(setData)
       .catch((err: unknown) =>
@@ -88,6 +118,10 @@ export default function Forecast({ token }: Props) {
   };
 
   useEffect(() => {
+    if (isDemoMode()) {
+      setTopSkus(getDemoForecastTopSkus({ days: 30, marketplace, limit: 20 }));
+      return;
+    }
     if (!token || mode !== "sku") return;
     setError(null);
     forecastTopSkus(token, { days: 30, marketplace, limit: 20 })
@@ -106,6 +140,18 @@ export default function Forecast({ token }: Props) {
   }, [token, mode, marketplace, horizonDays, effectiveSku]);
 
   useEffect(() => {
+    if (isDemoMode() && mode === "sku" && effectiveSku) {
+      setRestockPlan(
+        getDemoForecastRestockPlan({
+          sku: effectiveSku,
+          horizon_days: horizonDays,
+          lead_time_days: leadTimeDays,
+          service_level: serviceLevel,
+          marketplace,
+        })
+      );
+      return;
+    }
     if (!token || mode !== "sku" || !effectiveSku) {
       setRestockPlan(null);
       return;
@@ -176,12 +222,12 @@ export default function Forecast({ token }: Props) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
         <LoadingSkeleton count={4} />
-        <div style={{ height: 360 }}>
+        <div style={{ height: 200 }}>
           <LoadingSkeleton
             children={
               <div
                 style={{
-                  height: 360,
+                  height: 200,
                   borderRadius: "var(--radius-md)",
                   backgroundColor: "var(--color-border)",
                   animation: "skeleton-pulse 1.5s ease-in-out infinite",
@@ -198,7 +244,7 @@ export default function Forecast({ token }: Props) {
     return (
       <EmptyState
         title="Select a SKU"
-        description="Choose a SKU from the dropdown or enter one manually to see the demand forecast and restock plan."
+        description="Choose a SKU from the dropdown or enter one manually to see the demand forecast and restock plan. If you have no data yet, load sample data from the Dashboard or connect your Amazon account in Settings."
       />
     );
   }
@@ -207,7 +253,7 @@ export default function Forecast({ token }: Props) {
     return (
       <EmptyState
         title="No forecast data"
-        description="Unable to load the total forecast. Try again or adjust filters."
+        description="Unable to load the total forecast. Try again or adjust filters. You can also load sample data from the Dashboard to explore forecasts, or check your marketplace selection in Settings."
         action={
           <button
             type="button"
@@ -231,8 +277,33 @@ export default function Forecast({ token }: Props) {
 
   if (!data) return null;
 
+  const tableRows: ForecastTableRow[] = [
+    {
+      id: data.kind === "total" ? "total" : data.sku ?? "sku",
+      name: data.kind === "total" ? "Total" : data.sku ?? "SKU",
+      forecast: data,
+    },
+  ];
+
+  const summaryTitle = data.kind === "total" ? "Total forecast" : `Forecast: ${data.sku ?? ""}`;
+
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+      {isDemoMode() && (
+        <div
+          style={{
+            padding: "var(--space-2) var(--space-4)",
+            backgroundColor: "var(--color-warning-muted)",
+            color: "var(--color-warning)",
+            borderRadius: "var(--radius-md)",
+            fontSize: "var(--text-sm)",
+            fontWeight: "var(--font-medium)",
+          }}
+        >
+          Demo data — sample forecast for exploration. Clear in Settings to use real data.
+        </div>
+      )}
+
       <div
         style={{
           display: "flex",
@@ -242,7 +313,9 @@ export default function Forecast({ token }: Props) {
         }}
       >
         <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
-          <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>Mode:</span>
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
+            Mode:
+          </span>
           <button
             onClick={() => setMode("total")}
             style={{
@@ -271,7 +344,14 @@ export default function Forecast({ token }: Props) {
           </button>
         </div>
 
-        <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)" }}>
+        <label
+          style={{
+            display: "flex",
+            gap: "var(--space-2)",
+            alignItems: "center",
+            fontSize: "var(--text-sm)",
+          }}
+        >
           Marketplace
           <select
             value={marketplace}
@@ -292,7 +372,14 @@ export default function Forecast({ token }: Props) {
           </select>
         </label>
 
-        <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)" }}>
+        <label
+          style={{
+            display: "flex",
+            gap: "var(--space-2)",
+            alignItems: "center",
+            fontSize: "var(--text-sm)",
+          }}
+        >
           Horizon
           <select
             value={horizonDays}
@@ -315,7 +402,14 @@ export default function Forecast({ token }: Props) {
 
         {mode === "sku" && (
           <>
-            <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)" }}>
+            <label
+              style={{
+                display: "flex",
+                gap: "var(--space-2)",
+                alignItems: "center",
+                fontSize: "var(--text-sm)",
+              }}
+            >
               Lead time
               <select
                 value={leadTimeDays}
@@ -335,7 +429,14 @@ export default function Forecast({ token }: Props) {
                 ))}
               </select>
             </label>
-            <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)" }}>
+            <label
+              style={{
+                display: "flex",
+                gap: "var(--space-2)",
+                alignItems: "center",
+                fontSize: "var(--text-sm)",
+              }}
+            >
               Service level
               <select
                 value={serviceLevel}
@@ -355,7 +456,14 @@ export default function Forecast({ token }: Props) {
                 ))}
               </select>
             </label>
-            <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)" }}>
+            <label
+              style={{
+                display: "flex",
+                gap: "var(--space-2)",
+                alignItems: "center",
+                fontSize: "var(--text-sm)",
+              }}
+            >
               SKU
               <select
                 value={skuSelect}
@@ -377,7 +485,14 @@ export default function Forecast({ token }: Props) {
                 ))}
               </select>
             </label>
-            <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", fontSize: "var(--text-sm)" }}>
+            <label
+              style={{
+                display: "flex",
+                gap: "var(--space-2)",
+                alignItems: "center",
+                fontSize: "var(--text-sm)",
+              }}
+            >
               Or enter SKU
               <input
                 type="text"
@@ -397,9 +512,19 @@ export default function Forecast({ token }: Props) {
         )}
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "var(--space-4)", fontSize: "var(--text-sm)", color: "var(--color-text-muted)" }}>
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          alignItems: "center",
+          gap: "var(--space-4)",
+          fontSize: "var(--text-sm)",
+          color: "var(--color-text-muted)",
+        }}
+      >
         <span>
-          <strong style={{ color: "var(--color-text)" }}>Data through:</strong> {data.data_end_date}
+          <strong style={{ color: "var(--color-text)" }}>Data through:</strong>{" "}
+          {data.data_end_date}
         </span>
         <span>
           <strong style={{ color: "var(--color-text)" }}>Model:</strong> {data.model_name}
@@ -413,16 +538,221 @@ export default function Forecast({ token }: Props) {
           />
         </span>
         <Tooltip content={MAE_DESC}>
-          <span style={{ cursor: "help", borderBottom: "1px dotted var(--color-text-muted)" }}>
-            <strong style={{ color: "var(--color-text)" }}>MAE (30d):</strong> {formatDecimal(data.mae_30d, 4)}
+          <span
+            style={{
+              cursor: "help",
+              borderBottom: "1px dotted var(--color-text-muted)",
+            }}
+          >
+            <strong style={{ color: "var(--color-text)" }}>MAE (30d):</strong>{" "}
+            {formatDecimal(data.mae_30d, 4)}
           </span>
         </Tooltip>
         <Tooltip content={MAPE_DESC}>
-          <span style={{ cursor: "help", borderBottom: "1px dotted var(--color-text-muted)" }}>
-            <strong style={{ color: "var(--color-text)" }}>MAPE (30d):</strong> {formatPercent(data.mape_30d)}
+          <span
+            style={{
+              cursor: "help",
+              borderBottom: "1px dotted var(--color-text-muted)",
+            }}
+          >
+            <strong style={{ color: "var(--color-text)" }}>MAPE (30d):</strong>{" "}
+            {formatPercent(data.mape_30d)}
           </span>
         </Tooltip>
       </div>
+
+      <ForecastSummaryCard
+        title={summaryTitle}
+        intelligence={data.intelligence}
+        horizonDays={data.horizon_days}
+        recommendation={data.recommendation}
+        reasoning={data.reasoning}
+      />
+
+      <Card>
+        <div style={{ padding: "var(--space-4)" }}>
+          <h3
+            style={{
+              margin: "0 0 var(--space-4)",
+              fontSize: "var(--text-lg)",
+              fontWeight: "var(--font-semibold)",
+              color: "var(--color-text)",
+            }}
+          >
+            Forecast summary
+          </h3>
+          <ForecastTable rows={tableRows} />
+        </div>
+      </Card>
+
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowCharts(!showCharts)}
+          style={{
+            padding: "var(--space-2) var(--space-4)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            backgroundColor: showCharts ? "var(--color-bg-muted)" : "transparent",
+            fontSize: "var(--text-sm)",
+            fontWeight: "var(--font-medium)",
+            cursor: "pointer",
+            color: "var(--color-text)",
+          }}
+        >
+          {showCharts ? "Hide chart" : "Show chart (optional)"}
+        </button>
+
+        {showCharts && (
+          <div style={{ marginTop: "var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+            {backtestChartData.length > 0 && (
+              <ChartContainer
+                title="Details — Backtest (last 30 days)"
+                subtitle="Actual vs predicted units"
+                dataThroughDate={data.data_end_date}
+              >
+                <ResponsiveContainer width="100%" height={220}>
+                  <LineChart
+                    data={backtestChartData}
+                    margin={{ top: 8, right: 24, left: 8, bottom: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                    <XAxis
+                      dataKey="dateLabel"
+                      tick={{ fontSize: 10 }}
+                      stroke="var(--color-text-muted)"
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10 }}
+                      stroke="var(--color-text-muted)"
+                      tickFormatter={(v) => formatDecimal(Number(v), 0)}
+                    />
+                    <RechartsTooltip
+                      formatter={(value: number) => [formatDecimal(value, 0), "Units"]}
+                      labelFormatter={(_, payload) =>
+                        payload?.[0]?.payload?.date
+                          ? formatShortDate(payload[0].payload.date)
+                          : ""
+                      }
+                    />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="actual"
+                      name="Actual"
+                      stroke="var(--color-accent)"
+                      dot={false}
+                      connectNulls
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="predicted"
+                      name="Predicted"
+                      stroke="var(--color-error)"
+                      strokeDasharray="4 4"
+                      dot={false}
+                      connectNulls
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            )}
+
+            <ChartContainer
+              title="Details — Forecast"
+              subtitle="Actual and forecasted units"
+              dataThroughDate={data.data_end_date}
+            >
+              <ResponsiveContainer width="100%" height={360}>
+                <LineChart data={chartData} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                  <XAxis
+                    dataKey="dateLabel"
+                    tick={{ fontSize: 11 }}
+                    stroke="var(--color-text-muted)"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11 }}
+                    stroke="var(--color-text-muted)"
+                    tickFormatter={(v) => formatDecimal(Number(v), 0)}
+                  />
+                  <RechartsTooltip
+                    formatter={(value: number) => [
+                      value != null ? formatDecimal(Number(value), 0) : "—",
+                      "Units",
+                    ]}
+                    labelFormatter={(_, payload) =>
+                      payload?.[0]?.payload?.date
+                        ? formatShortDate(payload[0].payload.date)
+                        : ""
+                    }
+                  />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="actual"
+                    name="Actual (units)"
+                    stroke="var(--color-accent)"
+                    dot={false}
+                    connectNulls
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="forecast"
+                    name="Forecast (units)"
+                    stroke="var(--color-error)"
+                    strokeDasharray="4 4"
+                    dot={false}
+                    connectNulls
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </div>
+        )}
+      </div>
+
+      {mode === "sku" && restockPlan && (
+        <Card>
+          <div style={{ padding: "var(--space-6)" }}>
+            <h3
+              style={{
+                margin: "0 0 var(--space-4)",
+                fontSize: "var(--text-lg)",
+                fontWeight: "var(--font-semibold)",
+                color: "var(--color-text)",
+              }}
+            >
+              Restock plan
+            </h3>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "var(--space-2)",
+                fontSize: "var(--text-sm)",
+              }}
+            >
+              <p style={{ margin: 0 }}>
+                <strong>Forecast units during lead time:</strong>{" "}
+                {formatDecimal(restockPlan.forecast_units_lead_time, 2)}
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong>Safety stock units:</strong>{" "}
+                {formatDecimal(restockPlan.safety_stock_units, 2)}
+              </p>
+              <p style={{ margin: 0 }}>
+                <strong>Recommended reorder qty:</strong>{" "}
+                {formatDecimal(restockPlan.recommended_reorder_qty, 0)}
+              </p>
+              <p style={{ margin: 0, color: "var(--color-text-muted)" }}>
+                Lead time: {restockPlan.lead_time_days} days · Service level:{" "}
+                {restockPlan.service_level}
+              </p>
+            </div>
+          </div>
+        </Card>
+      )}
 
       <details
         style={{
@@ -434,103 +764,23 @@ export default function Forecast({ token }: Props) {
           border: "1px solid var(--color-border)",
         }}
       >
-        <summary style={{ cursor: "pointer", fontWeight: "var(--font-medium)", color: "var(--color-text)" }}>
+        <summary
+          style={{
+            cursor: "pointer",
+            fontWeight: "var(--font-medium)",
+            color: "var(--color-text)",
+          }}
+        >
           How to interpret this
         </summary>
         <p style={{ margin: "var(--space-3) 0 0 0", lineHeight: 1.5 }}>
-          MAE (Mean Absolute Error) is the average difference between predicted and actual units—lower is better.
-          MAPE (Mean Absolute Percentage Error) is that difference as a percentage—also lower is better. The forecast
-          quality badge summarizes how accurate the model has been recently. Forecasts are estimates; use the quality
+          MAE (Mean Absolute Error) is the average difference between predicted and actual
+          units—lower is better. MAPE (Mean Absolute Percentage Error) is that difference as
+          a percentage—also lower is better. The forecast quality badge summarizes how
+          accurate the model has been recently. Forecasts are estimates; use the quality
           badge as guidance.
         </p>
       </details>
-
-      {backtestChartData.length > 0 && (
-        <ChartContainer
-          title="Backtest (last 30 days)"
-          subtitle="Actual vs predicted units"
-          dataThroughDate={data.data_end_date}
-        >
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={backtestChartData} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-              <XAxis dataKey="dateLabel" tick={{ fontSize: 10 }} stroke="var(--color-text-muted)" />
-              <YAxis tick={{ fontSize: 10 }} stroke="var(--color-text-muted)" tickFormatter={(v) => formatDecimal(Number(v), 0)} />
-              <RechartsTooltip
-                formatter={(value: number) => [formatDecimal(value, 0), "Units"]}
-                labelFormatter={(_, payload) =>
-                  payload?.[0]?.payload?.date ? formatShortDate(payload[0].payload.date) : ""
-                }
-              />
-              <Legend />
-              <Line type="monotone" dataKey="actual" name="Actual" stroke="var(--color-accent)" dot={false} connectNulls />
-              <Line type="monotone" dataKey="predicted" name="Predicted" stroke="var(--color-error)" strokeDasharray="4 4" dot={false} connectNulls />
-            </LineChart>
-          </ResponsiveContainer>
-        </ChartContainer>
-      )}
-
-      <ChartContainer
-        title="Forecast"
-        subtitle="Actual and forecasted units"
-        dataThroughDate={data.data_end_date}
-      >
-        <ResponsiveContainer width="100%" height={360}>
-          <LineChart data={chartData} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-            <XAxis dataKey="dateLabel" tick={{ fontSize: 11 }} stroke="var(--color-text-muted)" />
-            <YAxis tick={{ fontSize: 11 }} stroke="var(--color-text-muted)" tickFormatter={(v) => formatDecimal(Number(v), 0)} />
-            <RechartsTooltip
-              formatter={(value: number) => [value != null ? formatDecimal(Number(value), 0) : "—", "Units"]}
-              labelFormatter={(_, payload) =>
-                payload?.[0]?.payload?.date ? formatShortDate(payload[0].payload.date) : ""
-              }
-            />
-            <Legend />
-            <Line
-              type="monotone"
-              dataKey="actual"
-              name="Actual (units)"
-              stroke="var(--color-accent)"
-              dot={false}
-              connectNulls
-            />
-            <Line
-              type="monotone"
-              dataKey="forecast"
-              name="Forecast (units)"
-              stroke="var(--color-error)"
-              strokeDasharray="4 4"
-              dot={false}
-              connectNulls
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </ChartContainer>
-
-      {mode === "sku" && restockPlan && (
-        <Card>
-          <div style={{ padding: "var(--space-6)" }}>
-            <h3 style={{ margin: "0 0 var(--space-4)", fontSize: "var(--text-lg)", fontWeight: "var(--font-semibold)", color: "var(--color-text)" }}>
-              Restock plan
-            </h3>
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", fontSize: "var(--text-sm)" }}>
-              <p style={{ margin: 0 }}>
-                <strong>Forecast units during lead time:</strong> {formatDecimal(restockPlan.forecast_units_lead_time, 2)}
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Safety stock units:</strong> {formatDecimal(restockPlan.safety_stock_units, 2)}
-              </p>
-              <p style={{ margin: 0 }}>
-                <strong>Recommended reorder qty:</strong> {formatDecimal(restockPlan.recommended_reorder_qty, 0)}
-              </p>
-              <p style={{ margin: 0, color: "var(--color-text-muted)" }}>
-                Lead time: {restockPlan.lead_time_days} days · Service level: {restockPlan.service_level}
-              </p>
-            </div>
-          </div>
-        </Card>
-      )}
     </section>
   );
 }

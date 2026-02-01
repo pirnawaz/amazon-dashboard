@@ -9,14 +9,96 @@ from sqlalchemy.orm import Session
 
 from app.api.routes.me import get_current_user
 from app.db.session import get_db
+from app.models.inventory import InventoryLevel
 from app.models.inventory_snapshot import InventorySnapshot
 from app.models.marketplace import Marketplace
 from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.models.user import User
-from app.schemas.inventory import RestockResponse, RestockRow
+from app.schemas.inventory import (
+    InventoryItemResponse,
+    InventoryListResponse,
+    InventoryUpsertRequest,
+    RestockResponse,
+    RestockRow,
+)
+from app.services.inventory_service import (
+    delete_inventory,
+    freshness_days,
+    get_inventory,
+    is_stale,
+    list_inventory,
+    upsert_inventory,
+)
 
 router = APIRouter()
+
+
+def _inventory_item_response(row: InventoryLevel) -> InventoryItemResponse:
+    fd = freshness_days(row.updated_at)
+    return InventoryItemResponse(
+        sku=row.sku,
+        marketplace=row.marketplace,
+        on_hand_units=float(row.on_hand_units),
+        reserved_units=float(row.reserved_units or 0),
+        available_units=row.available_units(),
+        source=row.source,
+        note=row.note,
+        updated_at=row.updated_at.isoformat(),
+        created_at=row.created_at.isoformat(),
+        freshness_days=fd,
+        is_stale=is_stale(fd),
+    )
+
+
+@router.get("/inventory", response_model=InventoryListResponse)
+def inventory_list(
+    marketplace: str | None = Query(default=None),
+    q: str | None = Query(default=None, description="SKU substring search (case-insensitive)"),
+    limit: int = Query(default=200, ge=1, le=500),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InventoryListResponse:
+    """GET /api/inventory — list inventory levels with optional filters."""
+    rows = list_inventory(db, marketplace=marketplace, q=q, limit=limit)
+    return InventoryListResponse(items=[_inventory_item_response(r) for r in rows])
+
+
+@router.get("/inventory/{marketplace}/{sku}", response_model=InventoryItemResponse)
+def inventory_get(
+    marketplace: str,
+    sku: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InventoryItemResponse:
+    """GET /api/inventory/{marketplace}/{sku} — get one inventory level."""
+    row = get_inventory(db, sku=sku, marketplace=marketplace)
+    if not row:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inventory not found")
+    return _inventory_item_response(row)
+
+
+@router.put("/inventory", response_model=InventoryItemResponse)
+def inventory_upsert(
+    body: InventoryUpsertRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> InventoryItemResponse:
+    """PUT /api/inventory — create or update inventory level."""
+    row = upsert_inventory(db, body)
+    return _inventory_item_response(row)
+
+
+@router.delete("/inventory/{marketplace}/{sku}", status_code=status.HTTP_204_NO_CONTENT)
+def inventory_delete(
+    marketplace: str,
+    sku: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """DELETE /api/inventory/{marketplace}/{sku}."""
+    delete_inventory(db, sku=sku, marketplace=marketplace)
+
 
 RISK_CRITICAL = "CRITICAL"
 RISK_LOW = "LOW"

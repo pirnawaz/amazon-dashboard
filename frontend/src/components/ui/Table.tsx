@@ -3,7 +3,7 @@ import EmptyState from "./EmptyState";
 
 type Column<T> = {
   key: keyof T | string;
-  header: string;
+  header: string | ReactNode;
   align?: "left" | "right";
   render?: (row: T) => ReactNode;
 };

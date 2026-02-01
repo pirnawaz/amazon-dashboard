@@ -18,12 +18,30 @@ def verify_password(password: str, password_hash: str) -> bool:
     return bcrypt.checkpw(raw, password_hash.encode("utf-8"))
 
 
-def create_access_token(*, subject: str, secret: str, algorithm: str, expires_minutes: int) -> str:
+def create_access_token(
+    *,
+    subject: str,
+    secret: str,
+    algorithm: str,
+    expires_minutes: int,
+    role: str | None = None,
+    **extra_claims: Any,
+) -> str:
+    """Create a JWT with sub (subject), iat, exp. Optionally include role and other claims."""
     now = datetime.now(timezone.utc)
     exp = now + timedelta(minutes=expires_minutes)
     payload: dict[str, Any] = {"sub": subject, "iat": int(now.timestamp()), "exp": exp}
+    if role is not None:
+        payload["role"] = role
+    payload.update(extra_claims)
     return jwt.encode(payload, secret, algorithm=algorithm)
 
 
 def decode_token(*, token: str, secret: str, algorithm: str) -> dict[str, Any]:
     return jwt.decode(token, secret, algorithms=[algorithm])
+
+
+def role_from_payload(payload: dict[str, Any]) -> str:
+    """Role from JWT payload; if missing or invalid, return 'owner' for backward compatibility."""
+    r = payload.get("role")
+    return r if r in ("owner", "partner") else "owner"

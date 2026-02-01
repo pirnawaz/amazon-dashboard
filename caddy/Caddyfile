@@ -1,17 +1,56 @@
+# Seller Hub — Production-ready Caddy configuration
+#
+# USAGE:
+#   - HTTP-only (dev / internal): use as-is with :80
+#   - HTTPS (production): replace ":80" with your domain, e.g. "sellerhub.example.com"
+#     Caddy will auto-obtain TLS and redirect HTTP -> HTTPS
+#
+# ROUTING:
+#   /api/*  -> backend (FastAPI)
+#   /docs*, /openapi.json, /redoc* -> backend (API docs)
+#   everything else -> frontend (React SPA)
+
 :80 {
-    handle /docs* {
-        reverse_proxy backend:8000
-    }
-    handle /openapi.json {
-        reverse_proxy backend:8000
-    }
-    handle /redoc* {
-        reverse_proxy backend:8000
-    }
-    handle /api/* {
-        reverse_proxy backend:8000
-    }
-    handle {
-        reverse_proxy frontend:5175
-    }
+	# --- Encoding ---
+	# Compress responses to save bandwidth. Safe for text/HTML/JSON.
+	encode gzip zstd
+
+	# --- Request body limit ---
+	request_body {
+		max_size 10MB
+	}
+
+	# --- API: backend ---
+	# All API traffic goes to FastAPI. Order matters: more specific paths first.
+	handle /api/* {
+		reverse_proxy backend:8000
+		# Basic security headers for API responses (non-breaking)
+		header {
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "DENY"
+		}
+	}
+	handle /docs* {
+		reverse_proxy backend:8000
+		header X-Content-Type-Options "nosniff"
+	}
+	handle /openapi.json {
+		reverse_proxy backend:8000
+	}
+	handle /redoc* {
+		reverse_proxy backend:8000
+		header X-Content-Type-Options "nosniff"
+	}
+
+	# --- Frontend: everything else ---
+	# SPA; all non-API routes served by frontend container.
+	handle {
+		reverse_proxy frontend:5175
+		# Basic security headers for pages
+		header {
+			X-Content-Type-Options "nosniff"
+			X-Frame-Options "SAMEORIGIN"
+			Referrer-Policy "strict-origin-when-cross-origin"
+		}
+	}
 }

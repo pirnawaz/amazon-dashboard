@@ -19,6 +19,22 @@ class BacktestPoint(BaseModel):
     predicted_units: float
 
 
+class ForecastRange(BaseModel):
+    """Low, expected, and high forecast totals over the horizon."""
+    low: float
+    expected: float
+    high: float
+
+
+class ForecastIntelligence(BaseModel):
+    """Forecast intelligence: trend, confidence, and range."""
+    trend: Literal["increasing", "stable", "decreasing", "insufficient_data"]
+    confidence: Literal["high", "medium", "low"]
+    daily_demand_estimate: float
+    volatility_cv: float
+    forecast_range: ForecastRange
+
+
 class ForecastResponse(BaseModel):
     """Response for GET /forecast/total and GET /forecast/sku."""
     kind: Literal["total", "sku"]
@@ -33,3 +49,6 @@ class ForecastResponse(BaseModel):
     backtest_points: list[BacktestPoint]
     actual_points: list[ForecastPoint]
     forecast_points: list[ForecastPoint]
+    intelligence: ForecastIntelligence
+    recommendation: str
+    reasoning: list[str]

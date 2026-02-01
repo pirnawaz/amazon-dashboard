@@ -13,12 +13,19 @@ from app.models.marketplace import Marketplace
 from app.models.order_item import OrderItem
 from app.models.product import Product
 from app.models.user import User
-from app.schemas.forecast import BacktestPoint, ForecastPoint, ForecastResponse
+from app.schemas.forecast import (
+    BacktestPoint,
+    ForecastIntelligence,
+    ForecastPoint,
+    ForecastRange,
+    ForecastResponse,
+)
 from app.services.forecasting import (
     _series_from_points,
     backtest_30d,
     seasonal_naive_weekly,
 )
+from app.services.forecast_intelligence import build_intelligence
 from app.services.timeseries import (
     get_data_end_date_sku,
     get_data_end_date_total,
@@ -76,6 +83,17 @@ def forecast_total(
     series = _series_from_points(actual_list)
     forecast_series = seasonal_naive_weekly(series, horizon_days)
     forecast_list = _forecast_series_to_points(forecast_series)
+    forecast_expected_total = float(forecast_series.sum())
+
+    history_daily_units = [float(u) for _, u in actual_list]
+    intelligence_result = build_intelligence(
+        history_daily_units=history_daily_units,
+        forecast_expected_total=forecast_expected_total,
+        horizon_days=horizon_days,
+        mape_30d=mape_30d,
+        lead_time_days=None,
+        current_stock_units=None,
+    )
 
     return ForecastResponse(
         kind="total",
@@ -90,6 +108,19 @@ def forecast_total(
         backtest_points=backtest_points,
         actual_points=_to_forecast_points(actual_list),
         forecast_points=forecast_list,
+        intelligence=ForecastIntelligence(
+            trend=intelligence_result.trend,
+            confidence=intelligence_result.confidence,
+            daily_demand_estimate=intelligence_result.daily_demand_estimate,
+            volatility_cv=intelligence_result.volatility_cv,
+            forecast_range=ForecastRange(
+                low=intelligence_result.forecast_low,
+                expected=intelligence_result.forecast_expected,
+                high=intelligence_result.forecast_high,
+            ),
+        ),
+        recommendation=intelligence_result.recommendation,
+        reasoning=intelligence_result.reasoning,
     )
 
 
@@ -116,6 +147,17 @@ def forecast_sku(
     series = _series_from_points(actual_list)
     forecast_series = seasonal_naive_weekly(series, horizon_days)
     forecast_list = _forecast_series_to_points(forecast_series)
+    forecast_expected_total = float(forecast_series.sum())
+
+    history_daily_units = [float(u) for _, u in actual_list]
+    intelligence_result = build_intelligence(
+        history_daily_units=history_daily_units,
+        forecast_expected_total=forecast_expected_total,
+        horizon_days=horizon_days,
+        mape_30d=mape_30d,
+        lead_time_days=None,
+        current_stock_units=None,
+    )
 
     return ForecastResponse(
         kind="sku",
@@ -130,6 +172,19 @@ def forecast_sku(
         backtest_points=backtest_points,
         actual_points=_to_forecast_points(actual_list),
         forecast_points=forecast_list,
+        intelligence=ForecastIntelligence(
+            trend=intelligence_result.trend,
+            confidence=intelligence_result.confidence,
+            daily_demand_estimate=intelligence_result.daily_demand_estimate,
+            volatility_cv=intelligence_result.volatility_cv,
+            forecast_range=ForecastRange(
+                low=intelligence_result.forecast_low,
+                expected=intelligence_result.forecast_expected,
+                high=intelligence_result.forecast_high,
+            ),
+        ),
+        recommendation=intelligence_result.recommendation,
+        reasoning=intelligence_result.reasoning,
     )
 
 

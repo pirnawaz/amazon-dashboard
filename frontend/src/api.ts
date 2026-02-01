@@ -3,9 +3,13 @@ export type TokenResponse = {
   token_type: "bearer";
 };
 
+/** User role from backend (owner | partner). */
+export type UserRole = "owner" | "partner";
+
 export type UserPublic = {
   id: number;
   email: string;
+  role: UserRole;
   created_at: string;
 };
 
@@ -78,6 +82,20 @@ export type BacktestPoint = {
   predicted_units: number;
 };
 
+export type ForecastRange = {
+  low: number;
+  expected: number;
+  high: number;
+};
+
+export type ForecastIntelligence = {
+  trend: "increasing" | "stable" | "decreasing" | "insufficient_data";
+  confidence: "high" | "medium" | "low";
+  daily_demand_estimate: number;
+  volatility_cv: number;
+  forecast_range: ForecastRange;
+};
+
 export type ForecastResponse = {
   kind: "total" | "sku";
   sku: string | null;
@@ -91,6 +109,9 @@ export type ForecastResponse = {
   backtest_points: BacktestPoint[];
   actual_points: ForecastPoint[];
   forecast_points: ForecastPoint[];
+  intelligence: ForecastIntelligence;
+  recommendation: string;
+  reasoning: string[];
 };
 
 export type ForecastRestockPlanResponse = {
@@ -131,6 +152,156 @@ export type RestockPlanResponse = {
   stockout_before_lead_time?: boolean | null;
 };
 
+/** Restock Actions (Phase 5C) */
+
+export type DemandRangeDaily = {
+  low: number;
+  expected: number;
+  high: number;
+};
+
+export type RestockActionStatus = "healthy" | "watch" | "urgent" | "insufficient_data";
+
+export type RestockActionItem = {
+  sku: string | null;
+  marketplace: string | null;
+  horizon_days: number;
+  lead_time_days: number;
+  service_level: number;
+  current_stock_units: number | null;
+  daily_demand_estimate: number;
+  demand_range_daily: DemandRangeDaily;
+  days_of_cover_expected: number | null;
+  days_of_cover_low: number | null;
+  days_of_cover_high: number | null;
+  stockout_date_expected: string | null;
+  order_by_date: string | null;
+  suggested_reorder_qty_expected: number;
+  suggested_reorder_qty_high: number;
+  status: RestockActionStatus;
+  recommendation: string;
+  reasoning: string[];
+};
+
+export type RestockActionsResponse = {
+  generated_at: string;
+  items: RestockActionItem[];
+};
+
+export type RestockActionsParams = {
+  marketplace?: string;
+  horizon_days?: number;
+  lead_time_days?: number;
+  service_level?: number;
+  current_stock_units?: number | null;
+};
+
+/** Inventory levels (Phase 6) */
+
+export type InventoryUpsertRequest = {
+  sku: string;
+  marketplace: string;
+  on_hand_units: number;
+  reserved_units?: number;
+  source?: string;
+  note?: string | null;
+};
+
+export type InventoryItemResponse = {
+  sku: string;
+  marketplace: string;
+  on_hand_units: number;
+  reserved_units: number;
+  available_units: number;
+  source: string;
+  note: string | null;
+  updated_at: string;
+  created_at: string;
+  freshness_days: number;
+  is_stale: boolean;
+};
+
+export type InventoryListResponse = {
+  items: InventoryItemResponse[];
+};
+
+export type InventoryListParams = {
+  marketplace?: string;
+  q?: string;
+  limit?: number;
+};
+
+/** Alerts (Phase 7B) */
+
+export type AlertEventResponse = {
+  id: number;
+  alert_type: string;
+  severity: string;
+  sku: string | null;
+  marketplace: string | null;
+  title: string;
+  message: string;
+  is_acknowledged: boolean;
+  acknowledged_at: string | null;
+  created_at: string;
+};
+
+export type AlertListResponse = {
+  items: AlertEventResponse[];
+};
+
+export type AlertListParams = {
+  severity?: string;
+  unacknowledged?: boolean;
+  limit?: number;
+};
+
+export type AlertSettingsResponse = {
+  email_enabled: boolean;
+  email_recipients: string | null;
+  send_inventory_stale: boolean;
+  send_urgent_restock: boolean;
+  send_reorder_soon: boolean;
+  send_order_by_passed: boolean;
+  stale_days_threshold: number;
+  updated_at: string;
+};
+
+export type AlertSettingsUpdateRequest = {
+  email_enabled?: boolean;
+  email_recipients?: string | null;
+  send_inventory_stale?: boolean;
+  send_urgent_restock?: boolean;
+  send_reorder_soon?: boolean;
+  send_order_by_passed?: boolean;
+  stale_days_threshold?: number;
+};
+
+/** Audit log (admin, owner-only) */
+export type AuditLogEntry = {
+  id: string;
+  created_at: string;
+  actor_user_id: number;
+  actor_email?: string | null;
+  action: string;
+  resource_type: string;
+  resource_id?: string | null;
+  metadata?: Record<string, unknown> | null;
+};
+
+export type AuditLogListResponse = {
+  items: AuditLogEntry[];
+  limit: number;
+  offset: number;
+  total: number;
+};
+
+/** Called when the API returns 401 (session expired). Set by AuthProvider to clear auth and redirect. */
+let onUnauthorized: (() => void) | null = null;
+export function setOnUnauthorized(callback: (() => void) | null): void {
+  onUnauthorized = callback;
+}
+
 export type ForecastTopSkuRow = {
   sku: string;
   title: string;
@@ -147,10 +318,18 @@ async function http<T>(url: string, options: RequestInit): Promise<T> {
   });
 
   if (!res.ok) {
+    if (res.status === 401 && onUnauthorized) {
+      onUnauthorized();
+    }
     const text = await res.text();
     try {
-      const j = JSON.parse(text) as { detail?: string; message?: string };
-      const msg = (j.detail ?? j.message ?? text) || `Request failed: ${res.status}`;
+      const j = JSON.parse(text) as {
+        error?: { message?: string };
+        detail?: string;
+        message?: string;
+      };
+      const msg =
+        (j.error?.message ?? j.detail ?? j.message ?? text) || `Request failed: ${res.status}`;
       throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
     } catch (e) {
       if (e instanceof SyntaxError) throw new Error(text || `Request failed: ${res.status}`);
@@ -174,6 +353,7 @@ export async function login(email: string, password: string): Promise<TokenRespo
   });
 }
 
+/** GET /api/me — current user (legacy). */
 export async function me(token: string): Promise<UserPublic> {
   return http<UserPublic>("/api/me", {
     method: "GET",
@@ -181,6 +361,20 @@ export async function me(token: string): Promise<UserPublic> {
       Authorization: `Bearer ${token}`,
     },
   });
+}
+
+/** Fetch current user: tries GET /api/auth/me first, falls back to GET /api/me. */
+export async function fetchCurrentUser(token: string): Promise<UserPublic> {
+  try {
+    return await http<UserPublic>("/api/auth/me", {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch {
+    return await me(token);
+  }
 }
 
 export async function dashboardSummary(
@@ -350,4 +544,200 @@ export async function restockPlan(
       ...(body.current_inventory != null && { current_inventory: body.current_inventory }),
     }),
   });
+}
+
+/** GET /api/restock/actions/total — restock actions for total forecast */
+export async function getRestockActionsTotal(
+  token: string,
+  params: RestockActionsParams
+): Promise<RestockActionsResponse> {
+  const sp = new URLSearchParams();
+  if (params.marketplace != null) sp.set("marketplace", params.marketplace);
+  if (params.horizon_days != null) sp.set("horizon_days", String(params.horizon_days));
+  if (params.lead_time_days != null) sp.set("lead_time_days", String(params.lead_time_days));
+  if (params.service_level != null) sp.set("service_level", String(params.service_level));
+  if (params.current_stock_units != null)
+    sp.set("current_stock_units", String(params.current_stock_units));
+  const qs = sp.toString();
+  return http<RestockActionsResponse>(
+    `/api/restock/actions/total${qs ? `?${qs}` : ""}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+}
+
+/** GET /api/restock/actions/sku/:sku — restock actions for a SKU */
+export async function getRestockActionsSku(
+  token: string,
+  sku: string,
+  params: RestockActionsParams
+): Promise<RestockActionsResponse> {
+  const sp = new URLSearchParams();
+  if (params.marketplace != null) sp.set("marketplace", params.marketplace);
+  if (params.horizon_days != null) sp.set("horizon_days", String(params.horizon_days));
+  if (params.lead_time_days != null) sp.set("lead_time_days", String(params.lead_time_days));
+  if (params.service_level != null) sp.set("service_level", String(params.service_level));
+  if (params.current_stock_units != null)
+    sp.set("current_stock_units", String(params.current_stock_units));
+  const qs = sp.toString();
+  return http<RestockActionsResponse>(
+    `/api/restock/actions/sku/${encodeURIComponent(sku)}${qs ? `?${qs}` : ""}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+}
+
+/** GET /api/inventory — list inventory levels */
+export async function getInventoryList(
+  token: string,
+  params: InventoryListParams = {}
+): Promise<InventoryListResponse> {
+  const sp = new URLSearchParams();
+  if (params.marketplace != null) sp.set("marketplace", params.marketplace);
+  if (params.q != null) sp.set("q", params.q);
+  if (params.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return http<InventoryListResponse>(`/api/inventory${qs ? `?${qs}` : ""}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/** GET /api/inventory/:marketplace/:sku — get one inventory level */
+export async function getInventoryItem(
+  token: string,
+  marketplace: string,
+  sku: string
+): Promise<InventoryItemResponse> {
+  return http<InventoryItemResponse>(
+    `/api/inventory/${encodeURIComponent(marketplace)}/${encodeURIComponent(sku)}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    }
+  );
+}
+
+/** PUT /api/inventory — create or update inventory level */
+export async function upsertInventory(
+  token: string,
+  payload: InventoryUpsertRequest
+): Promise<InventoryItemResponse> {
+  return http<InventoryItemResponse>("/api/inventory", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      sku: payload.sku,
+      marketplace: payload.marketplace,
+      on_hand_units: payload.on_hand_units,
+      reserved_units: payload.reserved_units ?? 0,
+      source: payload.source ?? "manual",
+      note: payload.note ?? null,
+    }),
+  });
+}
+
+/** GET /api/alerts — list alerts */
+export async function getAlerts(
+  token: string,
+  params: AlertListParams = {}
+): Promise<AlertListResponse> {
+  const sp = new URLSearchParams();
+  if (params.severity != null) sp.set("severity", params.severity);
+  if (params.unacknowledged != null) sp.set("unacknowledged", String(params.unacknowledged));
+  if (params.limit != null) sp.set("limit", String(params.limit));
+  const qs = sp.toString();
+  return http<AlertListResponse>(`/api/alerts${qs ? `?${qs}` : ""}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/** POST /api/alerts/ack — acknowledge alerts */
+export async function acknowledgeAlerts(
+  token: string,
+  ids: number[]
+): Promise<{ acknowledged: number }> {
+  return http<{ acknowledged: number }>("/api/alerts/ack", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ ids }),
+  });
+}
+
+/** GET /api/alerts/settings */
+export async function getAlertSettings(token: string): Promise<AlertSettingsResponse> {
+  return http<AlertSettingsResponse>("/api/alerts/settings", {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/** PUT /api/alerts/settings */
+export async function updateAlertSettings(
+  token: string,
+  patch: AlertSettingsUpdateRequest
+): Promise<AlertSettingsResponse> {
+  return http<AlertSettingsResponse>("/api/alerts/settings", {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(patch),
+  });
+}
+
+/** POST /api/alerts/run — trigger alert generation (manual) */
+export async function runAlertsNow(token: string): Promise<{ created: number; emailed: number }> {
+  return http<{ created: number; emailed: number }>("/api/alerts/run", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/** GET /api/admin/audit-log — list audit log entries (owner only). */
+export async function getAuditLog(
+  token: string,
+  params: { limit?: number; offset?: number }
+): Promise<AuditLogListResponse> {
+  const limit = params.limit ?? 50;
+  const offset = params.offset ?? 0;
+  const sp = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+  return http<AuditLogListResponse>(`/api/admin/audit-log?${sp}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
+/** DELETE /api/inventory/:marketplace/:sku — returns 204 No Content */
+export async function deleteInventory(
+  token: string,
+  marketplace: string,
+  sku: string
+): Promise<void> {
+  const res = await fetch(
+    `/api/inventory/${encodeURIComponent(marketplace)}/${encodeURIComponent(sku)}`,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  if (!res.ok) {
+    if (res.status === 401 && onUnauthorized) onUnauthorized();
+    const text = await res.text();
+    try {
+      const j = JSON.parse(text) as { error?: { message?: string }; detail?: string };
+      const msg = (j.error?.message ?? j.detail ?? text) || `Request failed: ${res.status}`;
+      throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+    } catch (e) {
+      if (e instanceof SyntaxError) throw new Error(text || `Request failed: ${res.status}`);
+      throw e;
+    }
+  }
+  if (res.status !== 204) await res.json();
 }

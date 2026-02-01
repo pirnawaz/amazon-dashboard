@@ -32,9 +32,10 @@ def get_current_user(
     user = db.scalar(select(User).where(User.id == user_id))
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    # Token may lack "role" (legacy); we always use DB role, so existing clients get correct role (owner default).
     return user
 
 
 @router.get("/me", response_model=UserPublic)
 def me(user: User = Depends(get_current_user)):
-    return UserPublic(id=user.id, email=user.email, created_at=user.created_at)
+    return UserPublic(id=user.id, email=user.email, role=user.role, created_at=user.created_at)

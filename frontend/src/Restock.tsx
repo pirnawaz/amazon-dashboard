@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { restock, type RestockResponse, type RestockRow } from "./api";
+import { getDemoRestock } from "./data/demoData";
 import Card from "./components/ui/Card";
 import Table from "./components/ui/Table";
 import EmptyState from "./components/ui/EmptyState";
 import LoadingSkeleton from "./components/ui/LoadingSkeleton";
 import { formatInteger, formatDecimal } from "./utils/format";
+import { isDemoMode } from "./utils/preferences";
 
 const DAYS_OPTIONS = [7, 30, 90] as const;
 const TARGET_DAYS_OPTIONS = [14, 30, 60] as const;
@@ -61,20 +63,14 @@ export default function Restock({ token }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadData = () => {
+  const loadData = useCallback(() => {
     setError(null);
     setLoading(true);
-    restock(token, { days, target_days: targetDays, marketplace, limit: 50 })
-      .then(setData)
-      .catch((err: unknown) =>
-        setError(err instanceof Error ? err.message : "Failed to load restock data")
-      )
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    setError(null);
-    setLoading(true);
+    if (isDemoMode()) {
+      setData(getDemoRestock({ days, target_days: targetDays, marketplace, limit: 50 }));
+      setLoading(false);
+      return;
+    }
     restock(token, { days, target_days: targetDays, marketplace, limit: 50 })
       .then(setData)
       .catch((err: unknown) =>
@@ -82,6 +78,10 @@ export default function Restock({ token }: Props) {
       )
       .finally(() => setLoading(false));
   }, [token, days, targetDays, marketplace]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   if (error) {
     return (
@@ -139,6 +139,20 @@ export default function Restock({ token }: Props) {
 
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
+      {isDemoMode() && (
+        <div
+          style={{
+            padding: "var(--space-2) var(--space-4)",
+            backgroundColor: "var(--color-warning-muted)",
+            color: "var(--color-warning)",
+            borderRadius: "var(--radius-md)",
+            fontSize: "var(--text-sm)",
+            fontWeight: "var(--font-medium)",
+          }}
+        >
+          Demo data — sample restock recommendations for exploration. Clear in Settings to use real data.
+        </div>
+      )}
       <div
         style={{
           display: "flex",
@@ -227,7 +241,7 @@ export default function Restock({ token }: Props) {
           data={data?.items ?? []}
           getRowKey={(r) => r.sku}
           emptyTitle="No restock items"
-          emptyDescription="No restock recommendations for the selected period and marketplace. Try different filters."
+          emptyDescription="No restock recommendations for the selected period and marketplace. Try different filters, load sample data from the Dashboard, or connect your Amazon account in Settings."
           stickyHeader
         />
       </Card>
