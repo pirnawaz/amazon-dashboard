@@ -1,0 +1,18 @@
+---
+description: Docker commands require full permissions when run from Cursor
+alwaysApply: true
+---
+
+# Docker from Cursor
+
+Docker on Windows talks to Docker Desktop over a named pipe (`npipe:////./pipe/dockerDesktopLinuxEngine`). Cursor's sandbox blocks access to that pipe.
+
+## When running Docker commands
+
+- **Always request full permissions** (`required_permissions: ["all"]`) for any `docker` or `docker compose` command run by the agent or in Cursor's terminal.
+- Without full permissions, commands fail with: `permission denied while trying to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine`.
+
+## Examples
+
+- `docker ps`, `docker build`, `docker run`, `docker compose up`, etc. → use `required_permissions: ["all"]`.
+- Pulling images or running containers that need network → full permissions also cover network; no need to add `network` separately.
