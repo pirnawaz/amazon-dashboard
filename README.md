@@ -1,6 +1,13 @@
 # Amazon
 
-Amazon Seller dashboard and tooling — production-ready multi-user dashboard with forecasting, restock planning, inventory, and alerts. **Sprints 1–11** completed (see [amazon-dashboard/docs/CHANGELOG.md](amazon-dashboard/docs/CHANGELOG.md)).
+Amazon Seller dashboard and tooling — production-ready multi-user dashboard with forecasting, restock planning, inventory, and alerts.
+
+## Project status (high level)
+
+- **Completed:** Sprints 1–6, 7–8 (roles/audit/alerts), Phase 9 (SP-API connection), Phase 10 (orders sync), Sprint 11 (Insights/UX + Phase 11.4/11.5), Phase 12 (catalog mapping + data health + mapped demand + CSV tooling).
+- **Remaining:** Phase 13 (next).
+
+Sprint ↔ Phase mapping and verification steps live in **[amazon-dashboard/README.md](amazon-dashboard/README.md)** and **[amazon-dashboard/docs/CHANGELOG.md](amazon-dashboard/docs/CHANGELOG.md)**.
 
 ## Contents
 
@@ -20,4 +27,4 @@ Amazon Seller dashboard and tooling — production-ready multi-user dashboard wi
    ```
    App at **http://localhost** (Caddy on 80; API at `/api`, Swagger at `/docs`).
 
-For repo structure, API, local dev, and deployment, see **[amazon-dashboard/README.md](amazon-dashboard/README.md)**.
+For repo structure, API, local dev, deployment, and verification checklist, see **[amazon-dashboard/README.md](amazon-dashboard/README.md)**.
