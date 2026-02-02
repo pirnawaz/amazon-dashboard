@@ -1,6 +1,6 @@
 # Amazon
 
-Amazon Seller dashboard and tooling — production-ready multi-user dashboard with forecasting, restock planning, inventory, and alerts.
+Amazon Seller dashboard and tooling — production-ready multi-user dashboard with forecasting, restock planning, inventory, and alerts. **Sprints 1–11** completed (see [amazon-dashboard/docs/CHANGELOG.md](amazon-dashboard/docs/CHANGELOG.md)).
 
 ## Contents
 

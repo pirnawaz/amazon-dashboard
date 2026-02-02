@@ -1,6 +1,6 @@
 # Amazon Dashboard (Seller + PPC + Forecasting)
 
-Production-ready Amazon Seller dashboard for shared users on a single DigitalOcean droplet.
+Production-ready Amazon Seller dashboard for shared users on a single DigitalOcean droplet. **Sprints 1–11** completed; see [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
 ## Tech stack
 
