@@ -73,7 +73,7 @@ export default function SystemHealthPage() {
   const [loadingSummary, setLoadingSummary] = useState(true);
   const [loadingJobs, setLoadingJobs] = useState(true);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
-  const [useDemo, setUseDemo] = useState(false);
+  const [usedDemoData, setUsedDemoData] = useState(false);
 
   const loadSummary = useCallback(() => {
     if (!token && !isDemoMode) return;
@@ -81,17 +81,17 @@ export default function SystemHealthPage() {
     if (isDemoMode) {
       setSummary(getDemoHealthSummary());
       setLoadingSummary(false);
-      setUseDemo(true);
+      setUsedDemoData(true);
       return;
     }
     getHealthSummary(token!)
       .then((s) => {
         setSummary(s);
-        setUseDemo(false);
+        setUsedDemoData(false);
       })
       .catch(() => {
         setSummary(getDemoHealthSummary());
-        setUseDemo(true);
+        setUsedDemoData(true);
       })
       .finally(() => setLoadingSummary(false));
   }, [token, isDemoMode]);
@@ -139,7 +139,7 @@ export default function SystemHealthPage() {
       <h1 style={{ marginBottom: "var(--space-2)", fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)" }}>
         System Health
       </h1>
-      {useDemo && (
+      {usedDemoData && (
         <p
           style={{
             marginBottom: "var(--space-4)",

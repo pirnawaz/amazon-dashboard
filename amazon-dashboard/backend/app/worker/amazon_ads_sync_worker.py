@@ -1,13 +1,15 @@
 """
 Amazon Ads sync worker (Sprint 13).
 
-Runs run_ads_sync for the single ads account. Respects rate limits; incremental sync by date.
+Runs run_ads_sync for the single ads account on an interval. Respects rate limits; incremental sync by date.
 Enable with ENABLE_AMAZON_ADS_SYNC=true; otherwise dry_run (no DB writes).
+Configure ADS_SYNC_INTERVAL_SECONDS (default 3600) for how often to run.
 """
 from __future__ import annotations
 
 import logging
 import os
+import time
 
 from sqlalchemy import select
 
@@ -81,8 +83,19 @@ def run_once(dry_run: bool | None = None) -> None:
 
 def main() -> None:
     dry_run = _dry_run_from_env()
-    logger.info("Amazon Ads sync worker (dry_run=%s)", dry_run)
-    run_once(dry_run=dry_run)
+    interval_seconds = int(os.getenv("ADS_SYNC_INTERVAL_SECONDS", "3600"))
+    logger.info(
+        "Amazon Ads sync worker starting (dry_run=%s, interval=%s s)",
+        dry_run,
+        interval_seconds,
+    )
+    while True:
+        try:
+            run_once(dry_run=dry_run)
+        except Exception as e:
+            logger.exception("Ads sync worker run failed: %s", e)
+        logger.info("Sleeping %s seconds", interval_seconds)
+        time.sleep(interval_seconds)
 
 
 if __name__ == "__main__":

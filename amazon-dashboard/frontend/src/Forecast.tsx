@@ -13,10 +13,10 @@ import {
   ComposedChart,
 } from "recharts";
 import {
-  forecastTotal,
-  forecastSku,
-  forecastTopSkus,
-  forecastRestockPlan,
+  getForecastTotal,
+  getForecastSku,
+  getForecastTopSkus,
+  getForecastRestockPlan,
   type ForecastResponse,
   type ForecastTopSkuRow,
   type ForecastRestockPlanResponse,
@@ -115,8 +115,8 @@ export default function Forecast({ token }: Props) {
     }
     const req =
       mode === "total"
-        ? forecastTotal(token!, params)
-        : forecastSku(token!, { ...params, sku: effectiveSku });
+        ? getForecastTotal(token!, params)
+        : getForecastSku(token!, { ...params, sku: effectiveSku });
     req
       .then(setData)
       .catch((err: unknown) =>
@@ -132,7 +132,7 @@ export default function Forecast({ token }: Props) {
     }
     if (!token || mode !== "sku") return;
     setError(null);
-    forecastTopSkus(token, { days: 30, marketplace, limit: 20 })
+    getForecastTopSkus(token, { days: 30, marketplace, limit: 20 })
       .then(setTopSkus)
       .catch(() => setTopSkus([]));
   }, [token, mode, marketplace]);
@@ -164,7 +164,7 @@ export default function Forecast({ token }: Props) {
       setRestockPlan(null);
       return;
     }
-    forecastRestockPlan(token, {
+    getForecastRestockPlan(token, {
       sku: effectiveSku,
       horizon_days: horizonDays,
       lead_time_days: leadTimeDays,

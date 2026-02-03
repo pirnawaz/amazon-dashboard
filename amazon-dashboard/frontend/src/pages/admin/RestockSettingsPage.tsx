@@ -9,12 +9,12 @@ import {
   type RestockSettingCreate,
   type RestockSettingUpdate,
   type RestockSupplierOut,
-} from "../api";
-import Card from "../components/ui/Card";
-import LoadingSkeleton from "../components/ui/LoadingSkeleton";
-import EmptyState from "../components/ui/EmptyState";
-import { useToast } from "../context/ToastContext";
-import { isDemoMode } from "../utils/preferences";
+} from "../../api";
+import Card from "../../components/ui/Card";
+import LoadingSkeleton from "../../components/ui/LoadingSkeleton";
+import EmptyState from "../../components/ui/EmptyState";
+import { useToast } from "../../context/ToastContext";
+import { isDemoMode } from "../../utils/preferences";
 
 type Props = {
   token: string;

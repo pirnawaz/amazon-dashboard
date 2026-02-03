@@ -609,12 +609,219 @@ export function adminInventorySync(token: string): Promise<{ ok: boolean; messag
   return request("POST", "/admin/amazon/inventory/sync", token);
 }
 
-// --- Catalog / Data health ---
+// --- Catalog mapping (Phase 12.1, 12.4) ---
+export interface UnmappedSkuRow {
+  sku: string;
+  marketplace_code: string;
+  seen_in_orders: boolean;
+  seen_in_inventory: boolean;
+  order_item_count: number;
+  inventory_row_count: number;
+  last_seen_date: string | null;
+  suggested_asin?: string | null;
+}
+
+export interface SkuMappingOut {
+  id: number;
+  sku: string;
+  marketplace_code: string;
+  asin: string | null;
+  fnsku: string | null;
+  product_id: number | null;
+  status: string;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductSearchHit {
+  id: number;
+  title: string;
+  sku: string | null;
+}
+
+export interface SkuMappingImportErrorRow {
+  row_number: number;
+  sku: string | null;
+  marketplace_code: string | null;
+  error: string;
+}
+
+export interface SkuMappingImportResponse {
+  total_rows: number;
+  created: number;
+  updated: number;
+  errors: SkuMappingImportErrorRow[];
+  dry_run: boolean;
+}
+
+export interface UnmappedSkuWithSuggestion extends UnmappedSkuRow {
+  suggested_product?: { id: number; sku: string | null; title: string } | null;
+  suggestion_reason?: "sku_exact_match" | "asin_match" | null;
+}
+
 export function getUnmappedSkus(
   token: string,
-  params: { limit: number; offset: number }
-): Promise<{ items: unknown[]; total: number }> {
-  return request("GET", `/admin/catalog/unmapped?limit=${params.limit}&offset=${params.offset}`, token);
+  params: { marketplace_code?: string; limit: number; offset: number }
+): Promise<{ items: UnmappedSkuRow[]; total: number }> {
+  const q = new URLSearchParams();
+  q.set("limit", String(params.limit));
+  q.set("offset", String(params.offset));
+  if (params.marketplace_code) q.set("marketplace_code", params.marketplace_code);
+  return request("GET", `/admin/catalog/unmapped-skus?${q}`, token);
+}
+
+export function getSkuMappings(
+  token: string,
+  params: { marketplace_code?: string; status?: string; limit: number; offset: number }
+): Promise<{ items: SkuMappingOut[]; total: number }> {
+  const q = new URLSearchParams();
+  q.set("limit", String(params.limit));
+  q.set("offset", String(params.offset));
+  if (params.marketplace_code) q.set("marketplace_code", params.marketplace_code);
+  if (params.status) q.set("status", params.status);
+  return request("GET", `/admin/catalog/sku-mappings?${q}`, token);
+}
+
+export function createOrUpdateSkuMapping(
+  token: string,
+  body: {
+    sku: string;
+    marketplace_code: string;
+    asin?: string | null;
+    fnsku?: string | null;
+    product_id?: number | null;
+    status?: string;
+    notes?: string | null;
+  }
+): Promise<SkuMappingOut> {
+  return request("POST", "/admin/catalog/sku-mappings", token, body);
+}
+
+export function patchSkuMapping(
+  token: string,
+  mappingId: number,
+  body: Partial<Pick<SkuMappingOut, "asin" | "fnsku" | "product_id" | "status" | "notes">>
+): Promise<SkuMappingOut> {
+  return request("PATCH", `/admin/catalog/sku-mappings/${mappingId}`, token, body);
+}
+
+export function searchProducts(
+  token: string,
+  q: string,
+  limit: number = 25
+): Promise<{ items: ProductSearchHit[] }> {
+  const params = new URLSearchParams({ q, limit: String(limit) });
+  return request("GET", `/admin/catalog/products/search?${params}`, token);
+}
+
+export function getUnmappedSuggestions(
+  token: string,
+  params: { marketplace_code?: string; limit: number; offset: number }
+): Promise<{ total: number; items: UnmappedSkuWithSuggestion[] }> {
+  const q = new URLSearchParams();
+  q.set("limit", String(params.limit));
+  q.set("offset", String(params.offset));
+  if (params.marketplace_code) q.set("marketplace_code", params.marketplace_code);
+  return request("GET", `/admin/catalog/unmapped-skus/suggestions?${q}`, token);
+}
+
+export async function exportSkuMappingsCsv(
+  token: string,
+  params: { marketplace_code?: string; status?: string; include_headers?: boolean }
+): Promise<Blob> {
+  const q = new URLSearchParams();
+  if (params.marketplace_code) q.set("marketplace_code", params.marketplace_code);
+  if (params.status) q.set("status", params.status);
+  if (params.include_headers !== undefined) q.set("include_headers", String(params.include_headers));
+  const url = `${API_BASE}/api/admin/catalog/sku-mappings/export?${q}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err?.detail || res.statusText || "Export failed";
+    throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+  }
+  return res.blob();
+}
+
+export async function importSkuMappingsCsv(
+  token: string,
+  file: File,
+  dryRun: boolean
+): Promise<SkuMappingImportResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  const url = `${API_BASE}/api/admin/catalog/sku-mappings/import?dry_run=${dryRun}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: form,
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err?.detail || res.statusText || "Import failed";
+    throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+  }
+  return res.json() as Promise<SkuMappingImportResponse>;
+}
+
+// --- Data health (Phase 12.2, 12.4) ---
+export interface DataHealthSummary {
+  unmapped_skus_total: number;
+  unmapped_units_30d: number;
+  total_units_30d: number;
+  unmapped_share_30d: number;
+  ignored_units_30d: number;
+  discontinued_units_30d: number;
+  window_start: string;
+  window_end: string;
+}
+
+export interface TopUnmappedSkuRow {
+  marketplace_code: string;
+  sku: string;
+  units_30d: number;
+  last_seen_date: string | null;
+  seen_in_orders?: boolean;
+  mapping_status: string | null;
+}
+
+export interface UnmappedTrendRow {
+  week_start: string;
+  total_units: number;
+  unmapped_units: number;
+  unmapped_share: number;
+}
+
+export function getDataHealthSummary(
+  token: string,
+  params?: { marketplace_code?: string }
+): Promise<DataHealthSummary> {
+  const q = params?.marketplace_code ? `?marketplace_code=${encodeURIComponent(params.marketplace_code)}` : "";
+  return request("GET", `/admin/data-health/summary${q}`, token);
+}
+
+export function getTopUnmappedSkus(
+  token: string,
+  params?: { marketplace_code?: string; limit?: number }
+): Promise<{ items: TopUnmappedSkuRow[] }> {
+  const q = new URLSearchParams();
+  if (params?.marketplace_code) q.set("marketplace_code", params.marketplace_code);
+  if (params?.limit != null) q.set("limit", String(params.limit));
+  const suffix = q.toString() ? `?${q}` : "";
+  return request("GET", `/admin/data-health/top-unmapped${suffix}`, token);
+}
+
+export function getUnmappedTrend(
+  token: string,
+  params?: { marketplace_code?: string }
+): Promise<{ items: UnmappedTrendRow[] }> {
+  const q = params?.marketplace_code ? `?marketplace_code=${encodeURIComponent(params.marketplace_code)}` : "";
+  return request("GET", `/admin/data-health/unmapped-trend${q}`, token);
 }
 
 // --- Restock ---
