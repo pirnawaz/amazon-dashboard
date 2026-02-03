@@ -18,6 +18,8 @@ import AmazonConnection from "./pages/AmazonConnection";
 import AuditLog from "./pages/AuditLog";
 import CatalogMappingPage from "./pages/admin/CatalogMappingPage";
 import DataHealthPage from "./pages/admin/DataHealthPage";
+import AdsPage from "./pages/AdsPage";
+import AdsAttributionPage from "./pages/AdsAttributionPage";
 
 const SESSION_EXPIRED_KEY = "seller-hub-session-expired";
 
@@ -238,6 +240,7 @@ function AppRoutes() {
       <Route path="/" element={<AuthenticatedShell />}>
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardRoute />} />
+        <Route path="ads" element={<AdsRoute />} />
         <Route path="forecasts" element={<ForecastRoute />} />
         <Route path="inventory" element={<InventoryRoute />} />
         <Route path="restock" element={<RestockActionsRoute />} />
@@ -294,6 +297,14 @@ function AppRoutes() {
 function DashboardRoute() {
   const { token } = useAuth();
   return token ? <Dashboard token={token} /> : null;
+}
+function AdsRoute() {
+  const { token } = useAuth();
+  return token ? <AdsPage token={token} /> : null;
+}
+function AdsAttributionRoute() {
+  const { token } = useAuth();
+  return token ? <AdsAttributionPage token={token} /> : null;
 }
 function ForecastRoute() {
   const { token } = useAuth();

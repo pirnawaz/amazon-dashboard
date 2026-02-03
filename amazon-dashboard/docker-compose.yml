@@ -60,6 +60,26 @@ services:
         condition: service_healthy
     restart: always
 
+  ads_sync_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-amazon_user}
+      POSTGRES_DB: ${POSTGRES_DB:-amazon_dashboard}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-amazon_user}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-amazon_dashboard}
+      ENABLE_AMAZON_ADS_SYNC: ${ENABLE_AMAZON_ADS_SYNC:-false}
+      AMAZON_ADS_CLIENT_ID: ${AMAZON_ADS_CLIENT_ID:-}
+      AMAZON_ADS_CLIENT_SECRET: ${AMAZON_ADS_CLIENT_SECRET:-}
+      AMAZON_ADS_REGION: ${AMAZON_ADS_REGION:-NA}
+      TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
+    command: ["python -m app.worker.amazon_ads_sync_worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
   frontend:
     build:
       context: ./frontend

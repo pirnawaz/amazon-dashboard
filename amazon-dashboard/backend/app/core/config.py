@@ -61,5 +61,14 @@ class Settings:
     inventory_stale_warning_hours: int = int(os.getenv("INVENTORY_STALE_WARNING_HOURS", "24"))
     inventory_stale_critical_hours: int = int(os.getenv("INVENTORY_STALE_CRITICAL_HOURS", "72"))
 
+    # Amazon Ads API (Sprint 13): optional; when set, sync can call Ads API
+    amazon_ads_client_id: str | None = os.getenv("AMAZON_ADS_CLIENT_ID") or None
+    amazon_ads_client_secret: str | None = os.getenv("AMAZON_ADS_CLIENT_SECRET") or None
+    amazon_ads_region: str = os.getenv("AMAZON_ADS_REGION", "NA").strip().upper()
+    # Rate limit: requests per second (Amazon recommends throttling)
+    amazon_ads_rate_limit_rps: float = float(os.getenv("AMAZON_ADS_RATE_LIMIT_RPS", "2.0"))
+    # Sprint 14: attribution lookback days for purchased product / advertised product reports
+    amazon_ads_attribution_lookback_days: int = int(os.getenv("AMAZON_ADS_ATTRIBUTION_LOOKBACK_DAYS", "30"))
+
 
 settings = Settings()

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from app.core.config import settings
 from cryptography.fernet import Fernet, InvalidToken
+from cryptography.exceptions import InvalidKey
 
 
 class TokenEncryptionError(Exception):

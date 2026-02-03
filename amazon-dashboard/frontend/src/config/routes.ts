@@ -14,6 +14,19 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     description: "Overview of revenue, units, and top products for your selected period.",
     breadcrumbs: [{ label: "Dashboard", path: "/dashboard" }],
   },
+  "/ads": {
+    title: "Ads",
+    description: "Amazon Ads: spend, sales, ACOS, ROAS by marketplace and date.",
+    breadcrumbs: [{ label: "Ads", path: "/ads" }],
+  },
+  "/ads/attribution": {
+    title: "Ads Attribution",
+    description: "SKU profitability: revenue, ad spend, attributed sales, COGS, net profit, ACOS/ROAS.",
+    breadcrumbs: [
+      { label: "Ads", path: "/ads" },
+      { label: "Attribution", path: "/ads/attribution" },
+    ],
+  },
   "/forecasts": {
     title: "Forecasts",
     description: "Demand forecasts and model accuracy metrics.",

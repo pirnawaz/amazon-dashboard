@@ -4,8 +4,8 @@ Amazon Seller dashboard and tooling — production-ready multi-user dashboard wi
 
 ## Project status (high level)
 
-- **Completed:** Sprints 1–6, 7–8 (roles/audit/alerts), Phase 9 (SP-API connection), Phase 10 (orders sync), Sprint 11 (Insights/UX + Phase 11.4/11.5), Phase 12 (catalog mapping + data health + mapped demand + CSV tooling).
-- **Remaining:** Phase 13 (next).
+- **Completed:** Sprints 1–6, 7–8 (roles/audit/alerts), Phase 9 (SP-API connection), Phase 10 (orders sync), Sprint 11 (Insights/UX + Phase 11.4/11.5), Phase 12 (catalog mapping + data health + mapped demand + CSV tooling), **Sprint 13** (Amazon Ads API: auth, token storage, read-only ingestion, Ads page with mock fallback), **Sprint 14** (Ads attribution and SKU profitability: revenue, COGS, ad spend, net profit, ACOS/ROAS, time-aligned charts).
+- **Remaining:** Sprints 15–20 (see amazon-dashboard/README.md).
 
 Sprint ↔ Phase mapping and verification steps live in **[amazon-dashboard/README.md](amazon-dashboard/README.md)** and **[amazon-dashboard/docs/CHANGELOG.md](amazon-dashboard/docs/CHANGELOG.md)**.
 

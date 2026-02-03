@@ -9,6 +9,8 @@ const SIDEBAR_GROUPS_BASE: { label: string; items: NavItem[] }[] = [
     label: "Insights",
     items: [
       { to: "/dashboard", label: "Dashboard" },
+      { to: "/ads", label: "Ads" },
+      { to: "/ads/attribution", label: "Attribution" },
       { to: "/forecasts", label: "Forecasts" },
       { to: "/restock", label: "Restock Actions" },
       { to: "/alerts", label: "Alerts" },

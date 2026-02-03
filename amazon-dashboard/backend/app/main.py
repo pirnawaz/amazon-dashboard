@@ -132,6 +132,7 @@ app.include_router(admin_catalog_router, prefix="/api")
 app.include_router(admin_data_health_router, prefix="/api")
 app.include_router(alerts_router, prefix="/api")
 app.include_router(amazon_router, prefix="/api")
+app.include_router(ads_router, prefix="/api")
 app.include_router(restock_router, prefix="/api")
 
 logger.info("Starting app in %s mode", settings.app_env)

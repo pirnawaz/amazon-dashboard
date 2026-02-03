@@ -27,6 +27,13 @@ import type {
   AlertListResponse,
   AlertSettingsResponse,
   AlertSettingsUpdateRequest,
+  AdsDashboardSummary,
+  AdsTimeseriesResponse,
+  AdsTimeseriesPoint,
+  SkuProfitabilityResponse,
+  SkuProfitabilityRow,
+  SkuTimeseriesResponse,
+  SkuTimeseriesPoint,
 } from "../api";
 
 const DEMO_DAYS = 45;
@@ -642,4 +649,132 @@ export function updateDemoAlertSettings(patch: AlertSettingsUpdateRequest): Aler
   }
   demoAlertSettingsStore.updated_at = new Date().toISOString();
   return getDemoAlertSettings();
+}
+
+// --- Ads (Sprint 13) demo ---
+export function getDemoAdsSummary(params: { days: number; marketplace: string }): AdsDashboardSummary {
+  const spend = 3200;
+  const sales = 28450;
+  return {
+    spend,
+    sales,
+    acos: sales > 0 ? (spend / sales) * 100 : null,
+    roas: spend > 0 ? sales / spend : null,
+    marketplace: params.marketplace,
+    days: params.days,
+  };
+}
+
+export function getDemoAdsTimeseries(params: { days: number; marketplace: string }): AdsTimeseriesResponse {
+  const days = Math.min(Math.max(1, params.days), DEMO_DAYS);
+  const start = DEMO_DAYS - days;
+  const slice = DEMO_DATES.slice(start, DEMO_DAYS);
+  const points: AdsTimeseriesPoint[] = slice.map((date, i) => {
+    const spend = 80 + (i % 7) * 15;
+    const sales = 400 + (i % 5) * 80;
+    return {
+      date,
+      spend: Math.round(spend * (0.9 + Math.random() * 0.2) * 100) / 100,
+      sales: Math.round(sales * (0.85 + Math.random() * 0.3) * 100) / 100,
+      acos: sales > 0 ? (spend / sales) * 100 : null,
+      roas: spend > 0 ? sales / spend : null,
+    };
+  });
+  return {
+    days: params.days,
+    marketplace: params.marketplace,
+    points,
+  };
+}
+
+// --- Ads Attribution (Sprint 14) demo ---
+const DEMO_SKU_PROFITABILITY: SkuProfitabilityRow[] = [
+  {
+    sku: "DEMO-SKU-001",
+    marketplace_code: "US",
+    revenue: 8200,
+    ad_spend: 420,
+    attributed_sales: 3800,
+    organic_sales: 4400,
+    units_sold: 240,
+    unit_cogs: 12.5,
+    total_cogs: 3000,
+    gross_profit: 5200,
+    net_profit: 4780,
+    acos: 11.05,
+    roas: 9.05,
+    warning_flags: [],
+  },
+  {
+    sku: "DEMO-SKU-002",
+    marketplace_code: "US",
+    revenue: 6500,
+    ad_spend: 380,
+    attributed_sales: 2900,
+    organic_sales: 3600,
+    units_sold: 180,
+    unit_cogs: null,
+    total_cogs: null,
+    gross_profit: null,
+    net_profit: null,
+    acos: 13.1,
+    roas: 7.63,
+    warning_flags: ["missing_cogs"],
+  },
+  {
+    sku: "DEMO-SKU-003",
+    marketplace_code: "US",
+    revenue: 4200,
+    ad_spend: null,
+    attributed_sales: null,
+    organic_sales: null,
+    units_sold: 120,
+    unit_cogs: 8,
+    total_cogs: 960,
+    gross_profit: 3240,
+    net_profit: null,
+    acos: null,
+    roas: null,
+    warning_flags: ["missing_attribution"],
+  },
+];
+
+export function getDemoSkuProfitability(params: {
+  days: number;
+  marketplace: string;
+}): SkuProfitabilityResponse {
+  return {
+    days: params.days,
+    marketplace: params.marketplace,
+    rows: DEMO_SKU_PROFITABILITY,
+  };
+}
+
+export function getDemoSkuTimeseries(
+  sku: string,
+  params: { days: number; marketplace: string }
+): SkuTimeseriesResponse {
+  const days = Math.min(Math.max(1, params.days), DEMO_DAYS);
+  const start = DEMO_DAYS - days;
+  const slice = DEMO_DATES.slice(start, DEMO_DAYS);
+  const points: SkuTimeseriesPoint[] = slice.map((date, i) => {
+    const revenue = 80 + (i % 7) * 25;
+    const adSpend = 12 + (i % 5) * 4;
+    const attributed = Math.round(revenue * 0.45);
+    const netProfit = revenue - (sku === "DEMO-SKU-002" ? 0 : revenue * 0.35) - adSpend;
+    return {
+      date,
+      revenue,
+      ad_spend: adSpend,
+      attributed_sales: attributed,
+      net_profit: netProfit,
+      units: 3 + (i % 4),
+    };
+  });
+  return {
+    sku,
+    days: params.days,
+    marketplace: params.marketplace,
+    points,
+  };
 }
