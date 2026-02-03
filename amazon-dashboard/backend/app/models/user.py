@@ -12,6 +12,7 @@ from app.db.base import Base
 class UserRole(str, enum.Enum):
     OWNER = "owner"
     PARTNER = "partner"
+    VIEWER = "viewer"
 
 
 class User(Base):
@@ -21,7 +22,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[UserRole] = mapped_column(
-        ENUM("owner", "partner", name="user_role", create_type=False),
+        ENUM("owner", "partner", "viewer", name="user_role", create_type=False),
         nullable=False,
         server_default="owner",
     )

@@ -60,6 +60,6 @@ Day-to-day operations: logs, debugging, rate limits.
 - On 401 Unauthorized, the frontend clears the session and redirects to login with a "Session expired" message.
 - Users must log in again after expiry.
 
-## Backups
+## Backups and runbooks
 
-See `docs/BACKUPS.md` for database backup and restore.
+See `docs/BACKUPS.md` for database backup and restore. For copy-paste backup/restore/upgrade, disaster recovery checklist, and common failure modes, see **`docs/ops.md`** (Sprint 19).

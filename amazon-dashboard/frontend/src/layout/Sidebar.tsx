@@ -34,24 +34,34 @@ const SIDEBAR_OWNER_ITEMS: NavItem[] = [
   { to: "/settings/alerts", label: "Alert settings" },
 ];
 
+/** Forecast overrides: owner and partner can edit; viewer cannot (link hidden for viewer). */
+const SIDEBAR_FORECAST_OVERRIDES_ITEM: NavItem[] = [
+  { to: "/forecast/overrides", label: "Forecast overrides" },
+];
+
 const SIDEBAR_ADMIN_ITEMS: NavItem[] = [
   { to: "/admin/audit-log", label: "Audit log" },
   { to: "/admin/amazon", label: "Amazon connection" },
+  { to: "/admin/amazon-accounts", label: "Amazon accounts" },
   { to: "/admin/catalog-mapping", label: "Catalog Mapping" },
   { to: "/admin/data-health", label: "Data Health" },
+  { to: "/admin/system-health", label: "System Health" },
+  { to: "/admin/suppliers", label: "Suppliers" },
+  { to: "/admin/restock-settings", label: "Restock settings" },
 ];
 
 function buildSidebarGroups(userRole: UserRole | undefined): { label: string; items: NavItem[] }[] {
   const isOwner = userRole === "owner";
-  if (!isOwner) return SIDEBAR_GROUPS_BASE;
-  return [
-    ...SIDEBAR_GROUPS_BASE.map((g) =>
-      g.label === "Settings"
-        ? { label: g.label, items: [...g.items, ...SIDEBAR_OWNER_ITEMS] }
-        : g
-    ),
-    { label: "Admin", items: SIDEBAR_ADMIN_ITEMS },
-  ];
+  const canEdit = userRole === "owner" || userRole === "partner";
+  const base = SIDEBAR_GROUPS_BASE.map((g) => {
+    if (g.label !== "Settings") return g;
+    let items = [...g.items];
+    if (canEdit) items = [...items, ...SIDEBAR_FORECAST_OVERRIDES_ITEM];
+    if (isOwner) items = [...items, ...SIDEBAR_OWNER_ITEMS];
+    return { label: g.label, items };
+  });
+  if (!isOwner) return base;
+  return [...base, { label: "Admin", items: SIDEBAR_ADMIN_ITEMS }];
 }
 
 type Props = {

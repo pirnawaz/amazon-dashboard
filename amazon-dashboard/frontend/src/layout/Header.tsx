@@ -1,6 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useToast } from "../context/ToastContext";
+import {
+  getSelectedAmazonAccountId,
+  setSelectedAmazonAccountId,
+  notifyAmazonAccountChanged,
+  listAmazonAccounts,
+  type UserRole,
+  type AmazonAccountResponse,
+} from "../api";
+import { getDemoAmazonAccounts } from "../data/demoData";
+import { isDemoMode } from "../utils/preferences";
 
 const MARKETPLACE_STORAGE_KEY = "seller-hub-marketplace";
 
@@ -20,8 +30,9 @@ type Props = {
   title: string;
   description?: string;
   breadcrumbs?: Breadcrumb[];
+  token?: string | null;
   userEmail?: string;
-  userRole?: "owner" | "partner";
+  userRole?: UserRole;
   onLogout?: () => void;
   onMenuClick?: () => void;
 };
@@ -30,6 +41,7 @@ export default function Header({
   title,
   description,
   breadcrumbs = [],
+  token,
   userEmail,
   userRole,
   onLogout,
@@ -37,7 +49,41 @@ export default function Header({
 }: Props) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [marketplace, setMarketplace] = useState(getStoredMarketplace);
+  const [amazonAccounts, setAmazonAccounts] = useState<AmazonAccountResponse[]>([]);
+  const [accountSelectKey, setAccountSelectKey] = useState(0);
   const { showToast } = useToast();
+
+  const canChangeAccount = userRole === "owner" || userRole === "partner";
+  const selectedAccountId = getSelectedAmazonAccountId();
+
+  const fetchAccounts = useCallback(() => {
+    if (!canChangeAccount) return;
+    if (isDemoMode()) {
+      setAmazonAccounts(getDemoAmazonAccounts());
+      return;
+    }
+    if (!token) return;
+    listAmazonAccounts(token)
+      .then(setAmazonAccounts)
+      .catch(() => setAmazonAccounts([]));
+  }, [token, canChangeAccount]);
+
+  useEffect(() => {
+    fetchAccounts();
+  }, [fetchAccounts]);
+
+  useEffect(() => {
+    const onAccountChanged = () => {
+      setAccountSelectKey((k) => k + 1);
+    };
+    window.addEventListener("seller-hub-amazon-account-changed", onAccountChanged);
+    return () => window.removeEventListener("seller-hub-amazon-account-changed", onAccountChanged);
+  }, []);
+
+  const currentAccountLabel =
+    selectedAccountId && amazonAccounts.length > 0
+      ? amazonAccounts.find((a) => String(a.id) === selectedAccountId)?.name ?? `Account ${selectedAccountId}`
+      : amazonAccounts[0]?.name ?? "Default";
 
   useEffect(() => {
     try {
@@ -108,6 +154,48 @@ export default function Header({
             gap: "var(--space-4)",
           }}
         >
+          {canChangeAccount && amazonAccounts.length > 0 && (
+            <div style={{ position: "relative" }}>
+              <select
+                key={accountSelectKey}
+                value={selectedAccountId ?? (amazonAccounts[0] ? String(amazonAccounts[0].id) : "")}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  setSelectedAmazonAccountId(v || null);
+                  notifyAmazonAccountChanged();
+                }}
+                aria-label="Select Amazon account"
+                title="Amazon account context for data"
+                style={{
+                  padding: "var(--space-2) var(--space-3)",
+                  fontSize: "var(--text-sm)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "var(--radius-md)",
+                  backgroundColor: "var(--color-bg-elevated)",
+                  color: "var(--color-text)",
+                  cursor: "pointer",
+                }}
+              >
+                {amazonAccounts.map((a) => (
+                  <option key={a.id} value={String(a.id)}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {userRole === "viewer" && (
+            <span
+              style={{
+                padding: "var(--space-2) var(--space-3)",
+                fontSize: "var(--text-sm)",
+                color: "var(--color-text-muted)",
+              }}
+              title="Read-only: you cannot switch accounts"
+            >
+              Account: {currentAccountLabel}
+            </span>
+          )}
           <div style={{ position: "relative" }}>
             <select
               value={marketplace}

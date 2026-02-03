@@ -1,15 +1,49 @@
 /**
  * API client for Amazon Dashboard backend.
  * Uses relative /api base when running behind proxy.
+ * Sprint 18: X-Amazon-Account-Id header from localStorage when not in demo mode.
  */
 
+import { isDemoMode } from "./utils/preferences";
+
 const API_BASE = "";
+
+/** localStorage key for selected Amazon account id (Sprint 18). */
+export const AMAZON_ACCOUNT_ID_KEY = "seller-hub-amazon-account-id";
 
 type OnUnauthorized = (() => void) | null;
 let onUnauthorized: OnUnauthorized = null;
 
 export function setOnUnauthorized(fn: OnUnauthorized): void {
   onUnauthorized = fn;
+}
+
+export function getSelectedAmazonAccountId(): string | null {
+  try {
+    const v = localStorage.getItem(AMAZON_ACCOUNT_ID_KEY);
+    return v && v.trim() ? v.trim() : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setSelectedAmazonAccountId(id: string | null): void {
+  try {
+    if (id == null || id === "") localStorage.removeItem(AMAZON_ACCOUNT_ID_KEY);
+    else localStorage.setItem(AMAZON_ACCOUNT_ID_KEY, id);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Call this when selected account changes so consumers can refetch. */
+export const AMAZON_ACCOUNT_CHANGED = "seller-hub-amazon-account-changed";
+export function notifyAmazonAccountChanged(): void {
+  try {
+    window.dispatchEvent(new Event(AMAZON_ACCOUNT_CHANGED));
+  } catch {
+    /* ignore */
+  }
 }
 
 async function request<T>(
@@ -21,6 +55,10 @@ async function request<T>(
   const url = `${API_BASE}/api${path}`;
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (!isDemoMode() && token) {
+    const accountId = getSelectedAmazonAccountId();
+    if (accountId) headers["X-Amazon-Account-Id"] = accountId;
+  }
   const res = await fetch(url, {
     method,
     headers,
@@ -37,7 +75,7 @@ async function request<T>(
 }
 
 // --- Auth & User ---
-export type UserRole = "owner" | "partner";
+export type UserRole = "owner" | "partner" | "viewer";
 
 export interface UserPublic {
   id: number;
@@ -60,6 +98,56 @@ export async function register(email: string, password: string): Promise<TokenRe
 
 export async function fetchCurrentUser(token: string): Promise<UserPublic> {
   return request("GET", "/auth/me", token);
+}
+
+// --- Amazon accounts (Sprint 18) ---
+export interface AmazonAccountResponse {
+  id: number;
+  name: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AmazonAccountCreate {
+  name: string;
+  is_active?: boolean;
+}
+
+export interface AmazonAccountUpdate {
+  name?: string;
+  is_active?: boolean;
+}
+
+export function listAmazonAccounts(
+  token: string,
+  params?: { include_inactive?: boolean }
+): Promise<AmazonAccountResponse[]> {
+  const q = params?.include_inactive ? "?include_inactive=true" : "";
+  return request("GET", `/admin/amazon-accounts${q}`, token);
+}
+
+export function getAmazonAccount(token: string, accountId: number): Promise<AmazonAccountResponse> {
+  return request("GET", `/admin/amazon-accounts/${accountId}`, token);
+}
+
+export function createAmazonAccount(
+  token: string,
+  body: AmazonAccountCreate
+): Promise<AmazonAccountResponse> {
+  return request("POST", "/admin/amazon-accounts", token, body);
+}
+
+export function updateAmazonAccount(
+  token: string,
+  accountId: number,
+  body: AmazonAccountUpdate
+): Promise<AmazonAccountResponse> {
+  return request("PUT", `/admin/amazon-accounts/${accountId}`, token, body);
+}
+
+export function deleteAmazonAccount(token: string, accountId: number): Promise<void> {
+  return request("DELETE", `/admin/amazon-accounts/${accountId}`, token);
 }
 
 // --- Dashboard ---
@@ -305,6 +393,73 @@ export function getAuditLog(
   params: { limit: number; offset: number }
 ): Promise<{ items: AuditLogEntry[]; limit: number; offset: number; total: number }> {
   return request("GET", `/admin/audit-log?limit=${params.limit}&offset=${params.offset}`, token);
+}
+
+// --- Admin System Health (Sprint 17) ---
+export interface LastJobRunSummary {
+  job_name: string;
+  last_started_at: string | null;
+  last_status: string | null;
+  last_finished_at: string | null;
+  last_error: string | null;
+}
+
+export interface HealthSummaryResponse {
+  status: "ok" | "warning" | "critical";
+  last_orders_sync_at: string | null;
+  last_ads_sync_at: string | null;
+  last_job_runs: LastJobRunSummary[];
+  failed_notifications_count: number;
+}
+
+export interface JobRunOut {
+  id: number;
+  job_name: string;
+  status: string;
+  started_at: string;
+  finished_at: string | null;
+  error: string | null;
+  job_metadata: Record<string, unknown> | null;
+}
+
+export interface NotificationDeliveryOut {
+  id: number;
+  notification_type: string;
+  severity: string;
+  channel: string;
+  recipient: string;
+  subject: string | null;
+  status: string;
+  attempts: number;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export function getHealthSummary(token: string): Promise<HealthSummaryResponse> {
+  return request("GET", "/admin/health/summary", token);
+}
+
+export function getHealthJobs(
+  token: string,
+  params?: { limit?: number }
+): Promise<JobRunOut[]> {
+  const q = new URLSearchParams();
+  if (params?.limit != null) q.set("limit", String(params.limit));
+  const suffix = q.toString() ? `?${q}` : "";
+  return request("GET", `/admin/health/jobs${suffix}`, token);
+}
+
+export function getHealthNotifications(
+  token: string,
+  params?: { status?: string; severity?: string; limit?: number }
+): Promise<NotificationDeliveryOut[]> {
+  const q = new URLSearchParams();
+  if (params?.status) q.set("status", params.status);
+  if (params?.severity) q.set("severity", params.severity);
+  if (params?.limit != null) q.set("limit", String(params.limit));
+  const suffix = q.toString() ? `?${q}` : "";
+  return request("GET", `/admin/health/notifications${suffix}`, token);
 }
 
 // --- Alerts ---
@@ -565,6 +720,29 @@ export interface BacktestPoint {
   predicted_units: number;
 }
 
+export interface ForecastBoundPoint {
+  date: string;
+  predicted_units: number;
+  lower: number;
+  upper: number;
+}
+
+export interface ForecastDrift {
+  flag: boolean;
+  window_days: number;
+  mae: number;
+  mape: number;
+  threshold: number;
+}
+
+export interface AppliedOverrideOut {
+  id: number;
+  override_type: string;
+  value: number;
+  start_date: string;
+  end_date: string;
+}
+
 export interface ForecastTopSkuRow {
   sku: string;
   title: string | null;
@@ -596,6 +774,15 @@ export interface ForecastResponse {
   forecast_points: ForecastPoint[];
   intelligence: ForecastIntelligence;
   recommendation: string;
+  reasoning?: string[];
+  excluded_units?: number | null;
+  excluded_skus?: number | null;
+  unmapped_units_30d?: number | null;
+  unmapped_share_30d?: number | null;
+  warnings?: string[] | null;
+  confidence_bounds?: ForecastBoundPoint[] | null;
+  drift?: ForecastDrift | null;
+  applied_overrides?: AppliedOverrideOut[] | null;
 }
 
 export interface ForecastRestockPlanResponse {
@@ -608,18 +795,39 @@ export interface ForecastRestockPlanResponse {
 
 export function getForecastTotal(
   token: string,
-  params: { history_days: number; horizon_days: number; marketplace: string }
+  params: {
+    history_days: number;
+    horizon_days: number;
+    marketplace: string;
+    include_unmapped?: boolean;
+  }
 ): Promise<ForecastResponse> {
-  const q = new URLSearchParams(params as Record<string, string>);
+  const q = new URLSearchParams({
+    history_days: String(params.history_days),
+    horizon_days: String(params.horizon_days),
+    marketplace: params.marketplace,
+  });
+  if (params.include_unmapped === true) q.set("include_unmapped", "true");
   return request("GET", `/forecast/total?${q}`, token);
 }
 
 export function getForecastSku(
   token: string,
-  params: { sku: string; history_days: number; horizon_days: number; marketplace: string }
+  params: {
+    sku: string;
+    history_days: number;
+    horizon_days: number;
+    marketplace: string;
+    include_unmapped?: boolean;
+  }
 ): Promise<ForecastResponse> {
-  const q = new URLSearchParams(params as Record<string, string>);
-  return request("GET", `/forecast/sku/${encodeURIComponent(params.sku)}?${q}`, token);
+  const q = new URLSearchParams({
+    history_days: String(params.history_days),
+    horizon_days: String(params.horizon_days),
+    marketplace: params.marketplace,
+  });
+  if (params.include_unmapped === true) q.set("include_unmapped", "true");
+  return request("GET", `/forecast/sku?sku=${encodeURIComponent(params.sku)}&${q}`, token);
 }
 
 export function getForecastTopSkus(
@@ -636,6 +844,72 @@ export function getForecastRestockPlan(
 ): Promise<ForecastRestockPlanResponse> {
   const q = new URLSearchParams(params);
   return request("GET", `/forecast/restock-plan?${q}`, token);
+}
+
+// --- Forecast overrides (Sprint 15, owner only) ---
+export interface ForecastOverrideResponse {
+  id: number;
+  sku: string | null;
+  marketplace_code: string | null;
+  start_date: string;
+  end_date: string;
+  override_type: string;
+  value: number;
+  reason: string | null;
+  created_by_user_id: number | null;
+  created_by_email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ForecastOverrideCreate {
+  sku?: string | null;
+  marketplace_code?: string | null;
+  start_date: string;
+  end_date: string;
+  override_type: "absolute" | "multiplier";
+  value: number;
+  reason?: string | null;
+}
+
+export interface ForecastOverrideUpdate {
+  sku?: string | null;
+  marketplace_code?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  override_type?: "absolute" | "multiplier" | null;
+  value?: number | null;
+  reason?: string | null;
+}
+
+export function getForecastOverrides(
+  token: string,
+  params: { sku?: string; marketplace?: string }
+): Promise<ForecastOverrideResponse[]> {
+  const q = new URLSearchParams();
+  if (params.sku) q.set("sku", params.sku);
+  if (params.marketplace) q.set("marketplace", params.marketplace);
+  const suffix = q.toString() ? `?${q}` : "";
+  return request("GET", `/forecast/overrides${suffix}`, token);
+}
+
+export function createForecastOverride(
+  token: string,
+  body: ForecastOverrideCreate
+): Promise<ForecastOverrideResponse> {
+  return request("POST", "/forecast/overrides", token, body);
+}
+
+export function updateForecastOverride(
+  token: string,
+  id: number,
+  body: ForecastOverrideUpdate
+): Promise<ForecastOverrideResponse> {
+  return request("PUT", `/forecast/overrides/${id}`, token, body);
+}
+
+export function deleteForecastOverride(token: string, id: number): Promise<void> {
+  return request("DELETE", `/forecast/overrides/${id}`, token);
 }
 
 // --- Inventory ---
@@ -689,4 +963,226 @@ export function deleteInventory(
   sku: string
 ): Promise<void> {
   return request("DELETE", `/inventory/${encodeURIComponent(marketplace)}/${encodeURIComponent(sku)}`, token);
+}
+
+// --- Restock Advanced (Sprint 16) ---
+export interface RestockSupplierOut {
+  id: number;
+  name: string;
+  contact_email: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RestockSupplierCreate {
+  name: string;
+  contact_email?: string | null;
+  notes?: string | null;
+}
+
+export interface RestockSupplierUpdate {
+  name?: string;
+  contact_email?: string | null;
+  notes?: string | null;
+}
+
+export interface RestockSettingOut {
+  id: number;
+  sku: string;
+  marketplace_code: string | null;
+  supplier_id: number;
+  lead_time_days_mean: number;
+  lead_time_days_std: number;
+  moq_units: number;
+  pack_size_units: number;
+  reorder_policy: string;
+  min_days_of_cover: number;
+  max_days_of_cover: number;
+  service_level: number;
+  holding_cost_rate: number | null;
+  stockout_cost_per_unit: number | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RestockSettingCreate {
+  sku: string;
+  marketplace_code?: string | null;
+  supplier_id: number;
+  lead_time_days_mean: number;
+  lead_time_days_std?: number;
+  moq_units?: number;
+  pack_size_units?: number;
+  reorder_policy?: string;
+  min_days_of_cover?: number;
+  max_days_of_cover?: number;
+  service_level?: number;
+  holding_cost_rate?: number | null;
+  stockout_cost_per_unit?: number | null;
+}
+
+export interface RestockSettingUpdate {
+  supplier_id?: number;
+  lead_time_days_mean?: number;
+  lead_time_days_std?: number;
+  moq_units?: number;
+  pack_size_units?: number;
+  reorder_policy?: string;
+  min_days_of_cover?: number;
+  max_days_of_cover?: number;
+  service_level?: number;
+  holding_cost_rate?: number | null;
+  stockout_cost_per_unit?: number | null;
+  is_active?: boolean;
+}
+
+export interface RestockRecommendationRowOut {
+  sku: string;
+  marketplace_code: string;
+  supplier_id: number | null;
+  supplier_name: string | null;
+  on_hand_units: number;
+  inbound_units: number;
+  reserved_units: number;
+  available_units: number;
+  daily_demand_forecast: number;
+  days_of_cover: number | null;
+  lead_time_days_mean: number;
+  lead_time_days_std: number;
+  safety_stock_units: number;
+  reorder_point_units: number;
+  target_stock_units: number;
+  recommended_order_units: number;
+  recommended_order_units_rounded: number;
+  priority_score: number;
+  reason_flags: string[];
+}
+
+export interface RestockWhatIfRequest {
+  sku: string;
+  marketplace_code: string;
+  lead_time_mean?: number;
+  lead_time_std?: number;
+  service_level?: number;
+  daily_demand_override?: number;
+  on_hand_override?: number;
+  inbound_override?: number;
+  reserved_override?: number;
+}
+
+export interface RestockWhatIfResponse {
+  result: RestockRecommendationRowOut;
+}
+
+export function getRestockSuppliers(token: string): Promise<RestockSupplierOut[]> {
+  return request("GET", "/restock/suppliers", token);
+}
+
+export function createRestockSupplier(
+  token: string,
+  body: RestockSupplierCreate
+): Promise<RestockSupplierOut> {
+  return request("POST", "/restock/suppliers", token, body);
+}
+
+export function updateRestockSupplier(
+  token: string,
+  id: number,
+  body: RestockSupplierUpdate
+): Promise<RestockSupplierOut> {
+  return request("PUT", `/restock/suppliers/${id}`, token, body);
+}
+
+export function deleteRestockSupplier(token: string, id: number): Promise<void> {
+  return request("DELETE", `/restock/suppliers/${id}`, token);
+}
+
+export function getRestockSettings(
+  token: string,
+  params?: { sku?: string; marketplace_code?: string }
+): Promise<RestockSettingOut[]> {
+  const q = new URLSearchParams();
+  if (params?.sku) q.set("sku", params.sku);
+  if (params?.marketplace_code) q.set("marketplace_code", params.marketplace_code);
+  const suffix = q.toString() ? `?${q}` : "";
+  return request("GET", `/restock/settings${suffix}`, token);
+}
+
+export function createRestockSetting(
+  token: string,
+  body: RestockSettingCreate
+): Promise<RestockSettingOut> {
+  return request("POST", "/restock/settings", token, body);
+}
+
+export function updateRestockSetting(
+  token: string,
+  id: number,
+  body: RestockSettingUpdate
+): Promise<RestockSettingOut> {
+  return request("PUT", `/restock/settings/${id}`, token, body);
+}
+
+export function deleteRestockSetting(token: string, id: number): Promise<void> {
+  return request("DELETE", `/restock/settings/${id}`, token);
+}
+
+export function getRestockRecommendations(
+  token: string,
+  params: {
+    days?: number;
+    marketplace?: string;
+    supplier_id?: number;
+    urgent_only?: boolean;
+    missing_settings_only?: boolean;
+  }
+): Promise<RestockRecommendationRowOut[]> {
+  const q = new URLSearchParams();
+  if (params.days != null) q.set("days", String(params.days));
+  if (params.marketplace) q.set("marketplace", params.marketplace);
+  if (params.supplier_id != null) q.set("supplier_id", String(params.supplier_id));
+  if (params.urgent_only === true) q.set("urgent_only", "true");
+  if (params.missing_settings_only === true) q.set("missing_settings_only", "true");
+  return request("GET", `/restock/recommendations?${q}`, token);
+}
+
+export function getRestockRecommendationDetail(
+  token: string,
+  sku: string,
+  params: { days?: number; marketplace?: string }
+): Promise<RestockRecommendationRowOut> {
+  const q = new URLSearchParams();
+  if (params.days != null) q.set("days", String(params.days));
+  if (params.marketplace) q.set("marketplace", params.marketplace);
+  return request("GET", `/restock/recommendations/${encodeURIComponent(sku)}?${q}`, token);
+}
+
+export function postRestockWhatIf(
+  token: string,
+  body: RestockWhatIfRequest
+): Promise<RestockWhatIfResponse> {
+  return request("POST", "/restock/what-if", token, body);
+}
+
+export async function getRestockExportCsv(
+  token: string,
+  params: { days?: number; marketplace?: string; supplier_id?: number }
+): Promise<Blob> {
+  const q = new URLSearchParams();
+  if (params.days != null) q.set("days", String(params.days));
+  if (params.marketplace) q.set("marketplace", params.marketplace);
+  if (params.supplier_id != null) q.set("supplier_id", String(params.supplier_id));
+  const url = `${API_BASE || ""}/api/restock/export/csv?${q}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+    credentials: "include",
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    const msg = err?.error?.message || err?.detail || res.statusText || "Export failed";
+    throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+  }
+  return res.blob();
 }

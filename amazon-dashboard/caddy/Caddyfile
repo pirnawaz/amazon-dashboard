@@ -23,7 +23,12 @@
 	# --- API: backend ---
 	# All API traffic goes to FastAPI. Order matters: more specific paths first.
 	handle /api/* {
-		reverse_proxy backend:8000
+		reverse_proxy backend:8000 {
+			transport http {
+				read_timeout 60s
+				write_timeout 60s
+			}
+		}
 		# Basic security headers for API responses (non-breaking)
 		header {
 			X-Content-Type-Options "nosniff"
@@ -45,7 +50,12 @@
 	# --- Frontend: everything else ---
 	# SPA; all non-API routes served by frontend container.
 	handle {
-		reverse_proxy frontend:5175
+		reverse_proxy frontend:5175 {
+			transport http {
+				read_timeout 30s
+				write_timeout 30s
+			}
+		}
 		# Basic security headers for pages
 		header {
 			X-Content-Type-Options "nosniff"

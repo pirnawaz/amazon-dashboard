@@ -14,6 +14,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   backend:
     build:
@@ -37,6 +38,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
 
   alerts_worker:
     build:
@@ -74,11 +80,37 @@ services:
       AMAZON_ADS_CLIENT_SECRET: ${AMAZON_ADS_CLIENT_SECRET:-}
       AMAZON_ADS_REGION: ${AMAZON_ADS_REGION:-NA}
       TOKEN_ENCRYPTION_KEY: ${TOKEN_ENCRYPTION_KEY:-}
-    command: ["python -m app.worker.amazon_ads_sync_worker"]
+    command: ["python", "-m", "app.worker.amazon_ads_sync_worker"]
     depends_on:
       db:
         condition: service_healthy
     restart: "no"
+
+  notifications_dispatch_worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-amazon_user}
+      POSTGRES_DB: ${POSTGRES_DB:-amazon_dashboard}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-amazon_user}:${POSTGRES_PASSWORD:-change_me}@db:5432/${POSTGRES_DB:-amazon_dashboard}
+      ENABLE_NOTIFICATIONS: ${ENABLE_NOTIFICATIONS:-true}
+      ENABLE_OPS_HEALTH_CHECKS: ${ENABLE_OPS_HEALTH_CHECKS:-true}
+      NOTIFICATIONS_INTERVAL_SECONDS: ${NOTIFICATIONS_INTERVAL_SECONDS:-300}
+      ORDERS_STALE_HOURS: ${ORDERS_STALE_HOURS:-12}
+      ADS_STALE_HOURS: ${ADS_STALE_HOURS:-24}
+      NOTIFICATIONS_RETRY_MAX: ${NOTIFICATIONS_RETRY_MAX:-3}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    command: ["python", "-m", "app.worker.notifications_dispatch_worker"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
 
   frontend:
     build:

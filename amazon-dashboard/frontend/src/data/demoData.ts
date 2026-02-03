@@ -14,6 +14,8 @@ import type {
   RestockRow,
   ForecastResponse,
   ForecastPoint,
+  ForecastBoundPoint,
+  ForecastDrift,
   BacktestPoint,
   ForecastTopSkuRow,
   ForecastRestockPlanResponse,
@@ -34,6 +36,12 @@ import type {
   SkuProfitabilityRow,
   SkuTimeseriesResponse,
   SkuTimeseriesPoint,
+  ForecastOverrideResponse,
+  RestockRecommendationRowOut,
+  HealthSummaryResponse,
+  JobRunOut,
+  NotificationDeliveryOut,
+  AmazonAccountResponse,
 } from "../api";
 
 const DEMO_DAYS = 45;
@@ -149,6 +157,23 @@ const DEMO_INTELLIGENCE = {
   forecast_range: { low: 450, expected: 546, high: 642 },
 };
 
+function demoConfidenceBounds(forecastPoints: ForecastPoint[], margin: number): ForecastBoundPoint[] {
+  return forecastPoints.map((p) => ({
+    date: p.date,
+    predicted_units: p.units,
+    lower: Math.max(0, Math.round(p.units - margin)),
+    upper: Math.round(p.units + margin),
+  }));
+}
+
+const DEMO_DRIFT: ForecastDrift = {
+  flag: true,
+  window_days: 14,
+  mae: 3.2,
+  mape: 0.18,
+  threshold: 0.12,
+};
+
 export function getDemoForecastTotal(params: { history_days: number; horizon_days: number; marketplace: string }): ForecastResponse {
   const dataEnd = DEMO_DATES[DEMO_DAYS - 1];
   const actualPoints: ForecastPoint[] = DEMO_DATES.slice(-Math.min(60, params.history_days)).map((date, i) => ({
@@ -160,13 +185,14 @@ export function getDemoForecastTotal(params: { history_days: number; horizon_day
   const expectedTotal = forecastPoints.reduce((s, p) => s + p.units, 0);
   const low = Math.round(expectedTotal * 0.82);
   const high = Math.round(expectedTotal * 1.18);
+  const confidence_bounds = demoConfidenceBounds(forecastPoints, 4);
   return {
     kind: "total",
     sku: null,
     marketplace: params.marketplace,
     history_days: params.history_days,
     horizon_days: params.horizon_days,
-    model_name: "demo-naive",
+    model_name: "demo-seasonality",
     mae_30d: 2.4,
     data_end_date: dataEnd,
     mape_30d: 0.12,
@@ -183,6 +209,9 @@ export function getDemoForecastTotal(params: { history_days: number; horizon_day
       "Demand is stable with no significant trend change.",
       "Forecast accuracy (MAPE) is good; plan with moderate buffer.",
     ],
+    confidence_bounds,
+    drift: DEMO_DRIFT,
+    applied_overrides: [],
   };
 }
 
@@ -197,6 +226,9 @@ export function getDemoForecastSku(params: { sku: string; history_days: number; 
       "Demand is stable with no significant trend change.",
       "Forecast accuracy (MAPE) is good; plan with moderate buffer.",
     ],
+    confidence_bounds: base.confidence_bounds ?? undefined,
+    drift: base.drift,
+    applied_overrides: base.applied_overrides ?? [],
   };
 }
 
@@ -255,6 +287,155 @@ export function getDemoRestockPlan(params: {
 
 export function getDemoSuggestedSkus(marketplace: string): string[] {
   return DEMO_SKUS.map((p) => p.sku);
+}
+
+// --- Forecast overrides (Sprint 15) demo ---
+const DEMO_OVERRIDES: ForecastOverrideResponse[] = [
+  {
+    id: 1,
+    sku: null,
+    marketplace_code: "US",
+    start_date: new Date(Date.now() + 86400_000 * 2).toISOString().slice(0, 10),
+    end_date: new Date(Date.now() + 86400_000 * 9).toISOString().slice(0, 10),
+    override_type: "multiplier",
+    value: 1.25,
+    reason: "Demo: promotion week",
+    created_by_user_id: 1,
+    created_by_email: "demo@example.com",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+export function getDemoForecastOverrides(params: {
+  sku?: string;
+  marketplace?: string;
+}): ForecastOverrideResponse[] {
+  let items = [...DEMO_OVERRIDES];
+  if (params.sku?.trim()) {
+    items = items.filter((r) => r.sku === params.sku!.trim());
+  }
+  if (params.marketplace?.trim()) {
+    items = items.filter((r) => r.marketplace_code === params.marketplace!.trim());
+  }
+  return items;
+}
+
+/** Sprint 16: Demo restock recommendations (advanced) */
+const DEMO_RESTOCK_RECOMMENDATIONS: RestockRecommendationRowOut[] = [
+  {
+    sku: "DEMO-SKU-001",
+    marketplace_code: "US",
+    supplier_id: 1,
+    supplier_name: "Demo Supplier A",
+    on_hand_units: 12,
+    inbound_units: 0,
+    reserved_units: 0,
+    available_units: 12,
+    daily_demand_forecast: 5.2,
+    days_of_cover: 2.31,
+    lead_time_days_mean: 14,
+    lead_time_days_std: 2,
+    safety_stock_units: 18,
+    reorder_point_units: 91,
+    target_stock_units: 127,
+    recommended_order_units: 115,
+    recommended_order_units_rounded: 120,
+    priority_score: 0.42,
+    reason_flags: ["urgent_stockout_risk", "moq_applied"],
+  },
+  {
+    sku: "DEMO-SKU-002",
+    marketplace_code: "US",
+    supplier_id: 1,
+    supplier_name: "Demo Supplier A",
+    on_hand_units: 28,
+    inbound_units: 0,
+    reserved_units: 0,
+    available_units: 28,
+    daily_demand_forecast: 4.0,
+    days_of_cover: 7.0,
+    lead_time_days_mean: 14,
+    lead_time_days_std: 2,
+    safety_stock_units: 14,
+    reorder_point_units: 70,
+    target_stock_units: 98,
+    recommended_order_units: 70,
+    recommended_order_units_rounded: 70,
+    priority_score: 0.14,
+    reason_flags: ["reorder_soon"],
+  },
+  {
+    sku: "DEMO-SKU-003",
+    marketplace_code: "US",
+    supplier_id: null,
+    supplier_name: null,
+    on_hand_units: 8,
+    inbound_units: 0,
+    reserved_units: 0,
+    available_units: 8,
+    daily_demand_forecast: 2.7,
+    days_of_cover: 2.96,
+    lead_time_days_mean: 14,
+    lead_time_days_std: 0,
+    safety_stock_units: 10,
+    reorder_point_units: 48,
+    target_stock_units: 67,
+    recommended_order_units: 59,
+    recommended_order_units_rounded: 59,
+    priority_score: 0.35,
+    reason_flags: ["missing_supplier_settings", "urgent_stockout_risk"],
+  },
+];
+
+export function getDemoRestockRecommendations(params: {
+  days?: number;
+  marketplace?: string;
+  supplier_id?: number;
+  urgent_only?: boolean;
+  missing_settings_only?: boolean;
+}): RestockRecommendationRowOut[] {
+  let items = [...DEMO_RESTOCK_RECOMMENDATIONS];
+  if (params.supplier_id != null) {
+    items = items.filter((r) => r.supplier_id === params.supplier_id);
+  }
+  if (params.urgent_only === true) {
+    items = items.filter((r) => r.reason_flags.includes("urgent_stockout_risk"));
+  }
+  if (params.missing_settings_only === true) {
+    items = items.filter((r) => r.reason_flags.includes("missing_supplier_settings"));
+  }
+  return items;
+}
+
+export function getDemoRestockDetail(params: {
+  sku: string;
+  days?: number;
+  marketplace?: string;
+}): RestockRecommendationRowOut {
+  const row = DEMO_RESTOCK_RECOMMENDATIONS.find((r) => r.sku === params.sku);
+  if (row) return { ...row };
+  return {
+    sku: params.sku,
+    marketplace_code: params.marketplace ?? "US",
+    supplier_id: null,
+    supplier_name: null,
+    on_hand_units: 0,
+    inbound_units: 0,
+    reserved_units: 0,
+    available_units: 0,
+    daily_demand_forecast: 0,
+    days_of_cover: null,
+    lead_time_days_mean: 14,
+    lead_time_days_std: 0,
+    safety_stock_units: 0,
+    reorder_point_units: 0,
+    target_stock_units: 0,
+    recommended_order_units: 0,
+    recommended_order_units_rounded: 0,
+    priority_score: 0,
+    reason_flags: ["missing_supplier_settings", "missing_forecast_fallback_used"],
+  };
 }
 
 /** Demo restock actions (Phase 5C): sensible demo with current_stock_units, status, order_by_date, reorder qty */
@@ -777,4 +958,58 @@ export function getDemoSkuTimeseries(
     marketplace: params.marketplace,
     points,
   };
+}
+
+// --- Sprint 17: System Health demo ---
+const nowIso = () => new Date().toISOString();
+const oneHourAgo = () => new Date(Date.now() - 3600 * 1000).toISOString();
+const twoHoursAgo = () => new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+
+export function getDemoHealthSummary(): HealthSummaryResponse {
+  return {
+    status: "ok",
+    last_orders_sync_at: oneHourAgo(),
+    last_ads_sync_at: twoHoursAgo(),
+    last_job_runs: [
+      { job_name: "orders_sync", last_started_at: oneHourAgo(), last_status: "success", last_finished_at: oneHourAgo(), last_error: null },
+      { job_name: "ads_sync", last_started_at: twoHoursAgo(), last_status: "success", last_finished_at: twoHoursAgo(), last_error: null },
+      { job_name: "notifications_dispatch", last_started_at: oneHourAgo(), last_status: "success", last_finished_at: oneHourAgo(), last_error: null },
+    ],
+    failed_notifications_count: 0,
+  };
+}
+
+export function getDemoHealthJobs(limit = 20): JobRunOut[] {
+  return [
+    { id: 1, job_name: "orders_sync", status: "success", started_at: oneHourAgo(), finished_at: oneHourAgo(), error: null, job_metadata: { orders_count: 42 } },
+    { id: 2, job_name: "ads_sync", status: "success", started_at: twoHoursAgo(), finished_at: twoHoursAgo(), error: null, job_metadata: { profiles_upserted: 2 } },
+    { id: 3, job_name: "notifications_dispatch", status: "success", started_at: oneHourAgo(), finished_at: oneHourAgo(), error: null, job_metadata: null },
+  ];
+}
+
+export function getDemoHealthNotifications(limit = 20): NotificationDeliveryOut[] {
+  return [
+    {
+      id: 1,
+      notification_type: "stale_orders",
+      severity: "warning",
+      channel: "ui",
+      recipient: "admin",
+      subject: "Orders sync is stale",
+      status: "sent",
+      attempts: 1,
+      last_error: null,
+      created_at: twoHoursAgo(),
+      updated_at: twoHoursAgo(),
+    },
+  ];
+}
+
+/** Sprint 18: Demo Amazon accounts for selector in demo mode. */
+export function getDemoAmazonAccounts(): AmazonAccountResponse[] {
+  const now = new Date().toISOString();
+  return [
+    { id: 1, name: "Default", is_active: true, created_at: now, updated_at: now },
+    { id: 2, name: "EU Account", is_active: true, created_at: now, updated_at: now },
+  ];
 }

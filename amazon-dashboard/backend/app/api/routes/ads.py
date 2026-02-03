@@ -9,8 +9,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.api.routes.me import get_current_user
+from app.api.deps.account_context import resolve_amazon_account_id
+from app.api.deps.permissions import require_can_trigger_sync, require_not_viewer
 from app.api.routes.ads_deps import require_owner_for_connect
+from app.api.routes.me import get_current_user
 from app.core.crypto import TokenEncryptionError, encrypt_token
 from app.db.session import get_db
 from app.models.ads import AdsAccount, AdsDailyMetrics, AdsProfile
@@ -45,12 +47,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/ads", tags=["ads"])
 
 
-def _get_or_create_ads_account(db: Session) -> AdsAccount:
-    """Single-tenant: one ads account."""
-    acc = db.scalar(select(AdsAccount).order_by(AdsAccount.id).limit(1))
+def _get_or_create_ads_account(db: Session, amazon_account_id: int | None = None) -> AdsAccount:
+    """Return ads account for account; when amazon_account_id omitted, first row (backward compatible)."""
+    q = select(AdsAccount).order_by(AdsAccount.id).limit(1)
+    if amazon_account_id is not None:
+        q = q.where(AdsAccount.amazon_account_id == amazon_account_id)
+    acc = db.scalar(q)
     if acc is not None:
         return acc
-    acc = AdsAccount(status="pending")
+    acc = AdsAccount(status="pending", amazon_account_id=amazon_account_id)
     db.add(acc)
     db.flush()
     return acc
@@ -61,10 +66,11 @@ def connect_ads_account(
     body: AdsAccountConnectRequest,
     user: User = Depends(require_owner_for_connect),
     db: Session = Depends(get_db),
+    amazon_account_id: int | None = Depends(resolve_amazon_account_id),
 ) -> AdsAccountResponse:
-    """Connect Amazon Ads account: store refresh token (encrypted at rest). Owner only."""
+    """Connect Amazon Ads account: store refresh token (encrypted at rest). Owner only. Respects X-Amazon-Account-Id."""
     logger.info("ads_connect_request", extra={"user_id": user.id})
-    acc = _get_or_create_ads_account(db)
+    acc = _get_or_create_ads_account(db, amazon_account_id)
     try:
         acc.refresh_token_encrypted = encrypt_token(body.refresh_token.strip())
     except TokenEncryptionError as e:
@@ -90,9 +96,13 @@ def connect_ads_account(
 def get_ads_account(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    amazon_account_id: int | None = Depends(resolve_amazon_account_id),
 ) -> AdsAccountResponse | None:
-    """Return the single ads account or null (no token returned)."""
-    acc = db.scalar(select(AdsAccount).order_by(AdsAccount.id).limit(1))
+    """Return the ads account or null (no token returned). Respects X-Amazon-Account-Id."""
+    q = select(AdsAccount).order_by(AdsAccount.id).limit(1)
+    if amazon_account_id is not None:
+        q = q.where(AdsAccount.amazon_account_id == amazon_account_id)
+    acc = db.scalar(q)
     if acc is None:
         return None
     return AdsAccountResponse(
@@ -135,16 +145,15 @@ def list_ads_profiles(
 
 @router.post("/sync", response_model=AdsSyncTriggerResponse)
 def trigger_ads_sync(
-    user: User = Depends(require_owner_for_connect),
+    user: User = Depends(require_can_trigger_sync),
     db: Session = Depends(get_db),
+    amazon_account_id: int | None = Depends(resolve_amazon_account_id),
 ) -> AdsSyncTriggerResponse:
-    """Trigger ads data sync (profiles, campaigns, ad groups, keywords/targets, daily metrics). Owner only."""
+    """Trigger ads data sync. Owner and partner may trigger; viewer cannot. Respects X-Amazon-Account-Id."""
     logger.info("ads_sync_trigger", extra={"user_id": user.id})
-    acc = db.scalar(select(AdsAccount).order_by(AdsAccount.id).limit(1))
-    if acc is None:
-        acc = _get_or_create_ads_account(db)
-        db.commit()
-        db.refresh(acc)
+    acc = _get_or_create_ads_account(db, amazon_account_id)
+    db.commit()
+    db.refresh(acc)
     result = run_ads_sync(db, acc, use_mock_metrics=True)
     if result.get("error"):
         return AdsSyncTriggerResponse(
@@ -350,7 +359,7 @@ def list_sku_costs(
 @router.put("/sku-cost", response_model=SkuCostResponse)
 def upsert_sku_cost(
     body: SkuCostCreate,
-    user: User = Depends(require_owner_for_connect),
+    user: User = Depends(require_not_viewer),
     db: Session = Depends(get_db),
 ) -> SkuCostResponse:
     """Create or update per-SKU cost (COGS). Owner only."""
@@ -391,7 +400,7 @@ def upsert_sku_cost(
 def delete_sku_cost(
     sku: str,
     marketplace_code: str | None = Query(default=None),
-    user: User = Depends(require_owner_for_connect),
+    user: User = Depends(require_not_viewer),
     db: Session = Depends(get_db),
 ) -> None:
     """Delete SKU cost for (sku, marketplace_code). marketplace_code=null means global. Owner only."""

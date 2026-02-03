@@ -1,30 +1,36 @@
-"""Owner-only permission dependency. Uses DB role, not JWT claim."""
+"""Sprint 18: Permission dependencies. Delegates to app.core.permissions; uses DB role."""
 from __future__ import annotations
 
-import logging
-
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Depends, Request
 
 from app.api.routes.me import get_current_user
-from app.models.user import User, UserRole
-
-logger = logging.getLogger(__name__)
+from app.core.permissions import (
+    require_can_trigger_sync as _require_can_trigger_sync,
+    require_not_viewer as _require_not_viewer,
+    require_owner as _require_owner,
+)
+from app.models.user import User
 
 
 def require_owner(
     request: Request,
     current_user: User = Depends(get_current_user),
 ) -> User:
-    """Reusable dependency: raise 403 if current_user.role is not owner. Uses DB role, not JWT claim."""
-    if current_user.role != UserRole.OWNER:
-        logger.warning(
-            "Owner access required: user_id=%s role=%s endpoint=%s",
-            current_user.id,
-            getattr(current_user.role, "value", current_user.role),
-            request.url.path,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Owner access required",
-        )
-    return current_user
+    """Reusable dependency: raise 403 if not owner. Owner: full access, manages integrations and users."""
+    return _require_owner(current_user, request)
+
+
+def require_not_viewer(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Reusable dependency: raise 403 if viewer. Blocks edits; owner and partner may proceed."""
+    return _require_not_viewer(current_user, request)
+
+
+def require_can_trigger_sync(
+    request: Request,
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Reusable dependency: raise 403 if viewer. Owner and partner may trigger sync."""
+    return _require_can_trigger_sync(current_user, request)

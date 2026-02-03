@@ -16,6 +16,7 @@ from app.api.routes.dashboard import router as dashboard_router
 from app.api.routes.dashboard_analytics import router as dashboard_analytics_router
 from app.api.routes.inventory import router as inventory_router
 from app.api.routes.forecast import router as forecast_router
+from app.api.routes.forecast_overrides import router as forecast_overrides_router
 from app.api.routes.forecast_restock import router as forecast_restock_router
 from app.api.routes.restock_actions import router as restock_actions_router
 from app.api.routes.admin import router as admin_router
@@ -24,9 +25,13 @@ from app.api.routes.admin_amazon_orders import router as admin_amazon_orders_rou
 from app.api.routes.admin_amazon_inventory import router as admin_amazon_inventory_router
 from app.api.routes.admin_catalog import router as admin_catalog_router
 from app.api.routes.admin_data_health import router as admin_data_health_router
+from app.api.routes.admin_amazon_accounts import router as admin_amazon_accounts_router
+from app.api.routes.admin_health import router as admin_health_router
 from app.api.routes.alerts import router as alerts_router
 from app.api.routes.amazon import router as amazon_router
+from app.api.routes.ads import router as ads_router
 from app.api.restock import router as restock_router
+from app.api.routes.restock_advanced import router as restock_advanced_router
 from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -122,17 +127,21 @@ app.include_router(dashboard_router, prefix="/api")
 app.include_router(dashboard_analytics_router, prefix="/api")
 app.include_router(inventory_router, prefix="/api")
 app.include_router(forecast_router, prefix="/api")
+app.include_router(forecast_overrides_router, prefix="/api")
 app.include_router(forecast_restock_router, prefix="/api")
 app.include_router(restock_actions_router, prefix="/api/restock")
 app.include_router(admin_router, prefix="/api")
+app.include_router(admin_amazon_accounts_router, prefix="/api")
 app.include_router(admin_amazon_spapi_router, prefix="/api")
 app.include_router(admin_amazon_orders_router, prefix="/api")
 app.include_router(admin_amazon_inventory_router, prefix="/api")
 app.include_router(admin_catalog_router, prefix="/api")
 app.include_router(admin_data_health_router, prefix="/api")
+app.include_router(admin_health_router, prefix="/api")
 app.include_router(alerts_router, prefix="/api")
 app.include_router(amazon_router, prefix="/api")
 app.include_router(ads_router, prefix="/api")
 app.include_router(restock_router, prefix="/api")
+app.include_router(restock_advanced_router, prefix="/api/restock")
 
 logger.info("Starting app in %s mode", settings.app_env)

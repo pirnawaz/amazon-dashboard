@@ -51,6 +51,7 @@ export default function AppShell({ token, userEmail, userRole, onLogout }: Props
           title={title}
           description={description}
           breadcrumbs={breadcrumbs}
+          token={token}
           userEmail={userEmail}
           userRole={userRole}
           onLogout={onLogout}

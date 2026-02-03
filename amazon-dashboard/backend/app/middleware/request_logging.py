@@ -29,5 +29,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             "status_code": response.status_code,
             "duration_ms": duration_ms,
         }
-        logger.info("request", extra=extra)
+        if duration_ms >= settings.slow_query_ms:
+            logger.warning("slow_request", extra={**extra, "threshold_ms": settings.slow_query_ms})
+        else:
+            logger.info("request", extra=extra)
         return response

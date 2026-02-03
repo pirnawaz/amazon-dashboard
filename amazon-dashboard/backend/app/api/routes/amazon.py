@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.api.deps.account_context import resolve_amazon_account_id
 from app.api.deps.permissions import require_owner
 from app.core.crypto import TokenEncryptionError, encrypt_token
 from app.db.session import get_db
@@ -25,17 +26,20 @@ from app.services.inventory_service import freshness_from_timestamp
 router = APIRouter(prefix="/amazon", tags=["amazon"])
 
 
-def _get_single_connection(db: Session) -> AmazonConnection | None:
-    """Single-tenant: return the one connection row or None."""
-    return db.scalar(select(AmazonConnection).order_by(AmazonConnection.id).limit(1))
+def _get_single_connection(db: Session, amazon_account_id: int | None = None) -> AmazonConnection | None:
+    """Return connection for account; when amazon_account_id omitted, first row (backward compatible)."""
+    q = select(AmazonConnection).order_by(AmazonConnection.id).limit(1)
+    if amazon_account_id is not None:
+        q = q.where(AmazonConnection.amazon_account_id == amazon_account_id)
+    return db.scalar(q)
 
 
-def _get_or_create_connection(db: Session) -> AmazonConnection:
-    """Single-tenant: return existing connection or create one."""
-    conn = _get_single_connection(db)
+def _get_or_create_connection(db: Session, amazon_account_id: int | None = None) -> AmazonConnection:
+    """Return existing connection for account or create one (with account link when provided)."""
+    conn = _get_single_connection(db, amazon_account_id)
     if conn is not None:
         return conn
-    conn = AmazonConnection(status=ConnectionStatus.PENDING)
+    conn = AmazonConnection(status=ConnectionStatus.PENDING, amazon_account_id=amazon_account_id)
     db.add(conn)
     db.flush()
     return conn
@@ -93,9 +97,10 @@ def _credential_to_safe_response(cred: AmazonCredential) -> AmazonCredentialSafe
 def get_connection(
     user: User = Depends(require_owner),
     db: Session = Depends(get_db),
+    amazon_account_id: int | None = Depends(resolve_amazon_account_id),
 ) -> AmazonConnectionResponse | None:
-    """Return the single Amazon connection row or null (owner only)."""
-    conn = _get_single_connection(db)
+    """Return the single Amazon connection row or null (owner only). Respects X-Amazon-Account-Id."""
+    conn = _get_single_connection(db, amazon_account_id)
     if conn is None:
         return None
     return _connection_to_response(conn)
@@ -106,9 +111,10 @@ def put_connection(
     body: AmazonConnectionUpsertRequest,
     user: User = Depends(require_owner),
     db: Session = Depends(get_db),
+    amazon_account_id: int | None = Depends(resolve_amazon_account_id),
 ) -> AmazonConnectionResponse:
-    """Upsert the single Amazon connection. Accept status, seller_identifier, marketplaces_json (owner only)."""
-    conn = _get_or_create_connection(db)
+    """Upsert the single Amazon connection. Accept status, seller_identifier, marketplaces_json (owner only). Respects X-Amazon-Account-Id."""
+    conn = _get_or_create_connection(db, amazon_account_id)
     patch = body.model_dump(exclude_unset=True)
     if "status" in patch:
         conn.status = patch["status"]
@@ -133,9 +139,10 @@ def put_connection(
 def get_credential(
     user: User = Depends(require_owner),
     db: Session = Depends(get_db),
+    amazon_account_id: int | None = Depends(resolve_amazon_account_id),
 ) -> AmazonCredentialSafeResponse | None:
-    """Return the single Amazon credential (safe: id, created_at, updated_at, connection_id, note, has_refresh_token). Never returns token (owner only). No audit log for read."""
-    conn = _get_single_connection(db)
+    """Return the single Amazon credential (safe). Never returns token (owner only). Respects X-Amazon-Account-Id."""
+    conn = _get_single_connection(db, amazon_account_id)
     if conn is None:
         return None
     cred = _get_credential_for_connection(db, conn.id)
@@ -149,9 +156,10 @@ def put_credential(
     body: AmazonCredentialUpsertRequest,
     user: User = Depends(require_owner),
     db: Session = Depends(get_db),
+    amazon_account_id: int | None = Depends(resolve_amazon_account_id),
 ) -> AmazonCredentialSafeResponse:
-    """Upsert Amazon credential for the connection. UI sends plaintext; we encrypt at rest. Token is never returned (owner only)."""
-    conn = _get_single_connection(db)
+    """Upsert Amazon credential for the connection. Token is never returned (owner only). Respects X-Amazon-Account-Id."""
+    conn = _get_single_connection(db, amazon_account_id)
     if conn is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -196,9 +204,10 @@ def put_credential(
 def post_connection_check(
     user: User = Depends(require_owner),
     db: Session = Depends(get_db),
+    amazon_account_id: int | None = Depends(resolve_amazon_account_id),
 ) -> AmazonConnectionCheckResponse:
-    """Placeholder health check: set connection status from credential token presence only (no decrypt). Owner only."""
-    conn = _get_or_create_connection(db)
+    """Placeholder health check: set connection status from credential token presence (owner only). Respects X-Amazon-Account-Id."""
+    conn = _get_or_create_connection(db, amazon_account_id)
     cred = _get_credential_for_connection(db, conn.id)
     has_token = cred is not None and cred.has_refresh_token
     now = datetime.now(timezone.utc)

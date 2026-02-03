@@ -14,6 +14,7 @@ from sqlalchemy import select
 from app.db.session import SessionLocal
 from app.models.ads import AdsAccount
 from app.services.amazon_ads_sync import run_ads_sync
+from app.services.job_run_log import record_job_finish, record_job_start
 
 logging.basicConfig(
     level=logging.INFO,
@@ -38,18 +39,41 @@ def run_once(dry_run: bool | None = None) -> None:
         if acc is None:
             logger.info("No ads_account; skipping ads sync")
             return
-        result = run_ads_sync(db, acc, use_mock_metrics=True, dry_run=dry_run)
-        logger.info(
-            "Ads sync job done (dry_run=%s): profiles=%s campaigns=%s metrics=%s error=%s",
-            dry_run,
-            result.get("profiles_upserted", 0),
-            result.get("campaigns_upserted", 0),
-            result.get("metrics_upserted", 0),
-            result.get("error"),
-        )
+        run_id = record_job_start(db, "ads_sync", metadata={"dry_run": dry_run})
+        try:
+            result = run_ads_sync(db, acc, use_mock_metrics=True, dry_run=dry_run)
+            record_job_finish(
+                db, run_id, "success",
+                metadata={
+                    "profiles_upserted": result.get("profiles_upserted", 0),
+                    "campaigns_upserted": result.get("campaigns_upserted", 0),
+                    "metrics_upserted": result.get("metrics_upserted", 0),
+                },
+            )
+            logger.info(
+                "Ads sync job done (dry_run=%s): profiles=%s campaigns=%s metrics=%s error=%s",
+                dry_run,
+                result.get("profiles_upserted", 0),
+                result.get("campaigns_upserted", 0),
+                result.get("metrics_upserted", 0),
+                result.get("error"),
+            )
+        except Exception as e:
+            record_job_finish(db, run_id, "failed", error=str(e))
+            db.commit()
+            logger.exception("Ads sync job failed: %s", e)
+            raise
+        # run_ads_sync commits internally when not dry_run
+        if dry_run:
+            db.rollback()
+        else:
+            db.commit()
     except Exception as e:
         logger.exception("Ads sync job failed: %s", e)
-        db.rollback()
+        try:
+            db.rollback()
+        except Exception:
+            pass
         raise
     finally:
         db.close()

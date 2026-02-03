@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel
 
+from app.schemas.forecast_override import AppliedOverrideOut, ForecastBoundPoint, ForecastDrift
+
 
 class ForecastPoint(BaseModel):
     """Single point: date (ISO str) and units (int)."""
@@ -36,7 +38,7 @@ class ForecastIntelligence(BaseModel):
 
 
 class ForecastResponse(BaseModel):
-    """Response for GET /forecast/total and GET /forecast/sku. Phase 12.2: optional mapping health fields."""
+    """Response for GET /forecast/total and GET /forecast/sku. Phase 12.2 + Sprint 15."""
     kind: Literal["total", "sku"]
     sku: str | None
     marketplace: str
@@ -58,3 +60,7 @@ class ForecastResponse(BaseModel):
     unmapped_units_30d: int | None = None
     unmapped_share_30d: float | None = None
     warnings: list[str] | None = None
+    # Sprint 15: confidence bounds, drift, applied overrides (optional for backward compat)
+    confidence_bounds: list[ForecastBoundPoint] | None = None
+    drift: ForecastDrift | None = None
+    applied_overrides: list[AppliedOverrideOut] | None = None

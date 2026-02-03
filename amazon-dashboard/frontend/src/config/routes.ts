@@ -32,6 +32,14 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     description: "Demand forecasts and model accuracy metrics.",
     breadcrumbs: [{ label: "Forecasts", path: "/forecasts" }],
   },
+  "/forecast/overrides": {
+    title: "Forecast overrides",
+    description: "Owner-only manual overrides (absolute or multiplier) for forecast output.",
+    breadcrumbs: [
+      { label: "Forecasts", path: "/forecasts" },
+      { label: "Overrides", path: "/forecast/overrides" },
+    ],
+  },
   "/restock": {
     title: "Restock Actions",
     description: "Restock actions from forecast intelligence: order-by date, reorder quantities, and recommendations.",
@@ -63,6 +71,30 @@ export const ROUTE_META: Record<string, RouteMeta> = {
       { label: "Planner", path: "/restock/planner" },
     ],
   },
+  "/restock/advanced": {
+    title: "Restock recommendations",
+    description: "Supplier-aware restock recommendations, what-if scenarios, and PO CSV export.",
+    breadcrumbs: [
+      { label: "Restock Actions", path: "/restock" },
+      { label: "Recommendations", path: "/restock/advanced" },
+    ],
+  },
+  "/admin/suppliers": {
+    title: "Suppliers",
+    description: "Manage suppliers (owner only).",
+    breadcrumbs: [
+      { label: "Admin", path: "/admin/audit-log" },
+      { label: "Suppliers", path: "/admin/suppliers" },
+    ],
+  },
+  "/admin/restock-settings": {
+    title: "SKU Supplier Settings",
+    description: "Manage SKU supplier settings: lead time, MOQ, pack size, service level (owner only).",
+    breadcrumbs: [
+      { label: "Admin", path: "/admin/audit-log" },
+      { label: "Restock settings", path: "/admin/restock-settings" },
+    ],
+  },
   "/settings": {
     title: "Settings",
     description: "Account and application preferences.",
@@ -88,8 +120,16 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     title: "Amazon connection",
     description: "SP-API connection and LWA credential (owner only).",
     breadcrumbs: [
-      { label: "Admin", path: "/admin/amazon" },
+      { label: "Admin", path: "/admin/audit-log" },
       { label: "Amazon connection", path: "/admin/amazon" },
+    ],
+  },
+  "/admin/amazon-accounts": {
+    title: "Amazon accounts",
+    description: "Manage Amazon account labels for multi-account context (owner only).",
+    breadcrumbs: [
+      { label: "Admin", path: "/admin/audit-log" },
+      { label: "Amazon accounts", path: "/admin/amazon-accounts" },
     ],
   },
   "/admin/catalog-mapping": {
@@ -106,6 +146,14 @@ export const ROUTE_META: Record<string, RouteMeta> = {
     breadcrumbs: [
       { label: "Admin", path: "/admin/audit-log" },
       { label: "Data Health", path: "/admin/data-health" },
+    ],
+  },
+  "/admin/system-health": {
+    title: "System Health",
+    description: "Ops health: sync status, job runs, notification delivery (owner only).",
+    breadcrumbs: [
+      { label: "Admin", path: "/admin/audit-log" },
+      { label: "System Health", path: "/admin/system-health" },
     ],
   },
 };

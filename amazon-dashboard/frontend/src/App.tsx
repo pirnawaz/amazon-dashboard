@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ToastProvider } from "./context/ToastContext";
 import { DemoProvider } from "./context/DemoContext";
+import { ErrorBoundary } from "./components/app/ErrorBoundary";
 import AppShell from "./layout/AppShell";
 import Dashboard from "./Dashboard";
 import Restock from "./Restock";
@@ -12,6 +13,7 @@ import Forecast from "./Forecast";
 import Inventory from "./Inventory";
 import Alerts from "./Alerts";
 import RequireOwner from "./components/auth/RequireOwner";
+import RequireNotViewer from "./components/auth/RequireNotViewer";
 import Settings from "./pages/Settings";
 import AlertSettings from "./pages/AlertSettings";
 import AmazonConnection from "./pages/AmazonConnection";
@@ -20,6 +22,12 @@ import CatalogMappingPage from "./pages/admin/CatalogMappingPage";
 import DataHealthPage from "./pages/admin/DataHealthPage";
 import AdsPage from "./pages/AdsPage";
 import AdsAttributionPage from "./pages/AdsAttributionPage";
+import ForecastOverridesPage from "./pages/ForecastOverridesPage";
+import RestockAdvancedPage from "./pages/RestockAdvancedPage";
+import SuppliersPage from "./pages/admin/SuppliersPage";
+import RestockSettingsPage from "./pages/admin/RestockSettingsPage";
+import SystemHealthPage from "./pages/admin/SystemHealthPage";
+import AmazonAccountsPage from "./pages/admin/AmazonAccountsPage";
 
 const SESSION_EXPIRED_KEY = "seller-hub-session-expired";
 
@@ -247,6 +255,7 @@ function AppRoutes() {
         <Route path="restock/actions" element={<Navigate to="/restock" replace />} />
         <Route path="restock/inventory" element={<RestockRoute />} />
         <Route path="restock/planner" element={<RestockPlannerRoute />} />
+        <Route path="restock/advanced" element={<RestockAdvancedRoute />} />
         <Route path="alerts" element={<AlertsRoute />} />
         <Route path="settings" element={<Settings />} />
         <Route
@@ -274,6 +283,14 @@ function AppRoutes() {
           }
         />
         <Route
+          path="admin/amazon-accounts"
+          element={
+            <RequireOwner>
+              <AmazonAccountsRoute />
+            </RequireOwner>
+          }
+        />
+        <Route
           path="admin/catalog-mapping"
           element={
             <RequireOwner>
@@ -286,6 +303,38 @@ function AppRoutes() {
           element={
             <RequireOwner>
               <DataHealthRoute />
+            </RequireOwner>
+          }
+        />
+        <Route
+          path="forecast/overrides"
+          element={
+            <RequireNotViewer>
+              <ForecastOverridesRoute />
+            </RequireNotViewer>
+          }
+        />
+        <Route
+          path="admin/suppliers"
+          element={
+            <RequireOwner>
+              <SuppliersRoute />
+            </RequireOwner>
+          }
+        />
+        <Route
+          path="admin/restock-settings"
+          element={
+            <RequireOwner>
+              <RestockSettingsRoute />
+            </RequireOwner>
+          }
+        />
+        <Route
+          path="admin/system-health"
+          element={
+            <RequireOwner>
+              <SystemHealthRoute />
             </RequireOwner>
           }
         />
@@ -346,17 +395,43 @@ function DataHealthRoute() {
   const { token } = useAuth();
   return token ? <DataHealthPage /> : null;
 }
+function ForecastOverridesRoute() {
+  const { token } = useAuth();
+  return token ? <ForecastOverridesPage /> : null;
+}
+function RestockAdvancedRoute() {
+  const { token, user } = useAuth();
+  return token && user ? <RestockAdvancedPage token={token} userRole={user.role} /> : null;
+}
+function SuppliersRoute() {
+  const { token } = useAuth();
+  return token ? <SuppliersPage token={token} /> : null;
+}
+function RestockSettingsRoute() {
+  const { token } = useAuth();
+  return token ? <RestockSettingsPage token={token} /> : null;
+}
+function AmazonAccountsRoute() {
+  const { token } = useAuth();
+  return token ? <AmazonAccountsPage token={token} /> : null;
+}
+function SystemHealthRoute() {
+  const { token } = useAuth();
+  return token ? <SystemHealthPage /> : null;
+}
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <ToastProvider>
-          <DemoProvider>
-            <AppRoutes />
-          </DemoProvider>
-        </ToastProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <ToastProvider>
+            <DemoProvider>
+              <AppRoutes />
+            </DemoProvider>
+          </ToastProvider>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }

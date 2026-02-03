@@ -14,6 +14,7 @@ from sqlalchemy import select
 from app.db.session import SessionLocal
 from app.models.amazon_connection import AmazonConnection
 from app.services.amazon_orders_sync import run_orders_sync
+from app.services.job_run_log import record_job_finish, record_job_start
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,12 +53,34 @@ def run_once(dry_run: bool | None = None, include_items: bool | None = None) -> 
         if conn is None:
             logger.info("No amazon_connection; skipping orders sync")
             return
-        run_orders_sync(db, conn, dry_run=dry_run, include_items=include_items)
+        run_id = record_job_start(db, "orders_sync", metadata={"dry_run": dry_run, "include_items": include_items})
+        try:
+            run_orders_sync(db, conn, dry_run=dry_run, include_items=include_items)
+            status = (conn.last_orders_sync_status or "ok").lower() if conn.last_orders_sync_status else "ok"
+            if status == "error":
+                record_job_finish(
+                    db, run_id, "failed",
+                    error=conn.last_orders_sync_error,
+                    metadata={"orders_count": conn.last_orders_sync_orders_count},
+                )
+            else:
+                record_job_finish(
+                    db, run_id, "success",
+                    metadata={"orders_count": conn.last_orders_sync_orders_count, "items_count": conn.last_orders_sync_items_count},
+                )
+        except Exception as e:
+            record_job_finish(db, run_id, "failed", error=str(e))
+            db.commit()
+            logger.exception("Orders sync job failed: %s", e)
+            raise
         db.commit()
         logger.info("Orders sync job done (dry_run=%s, include_items=%s)", dry_run, include_items)
     except Exception as e:
         logger.exception("Orders sync job failed: %s", e)
-        db.rollback()
+        try:
+            db.rollback()
+        except Exception:
+            pass
         raise
     finally:
         db.close()

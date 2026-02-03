@@ -44,4 +44,4 @@ def decode_token(*, token: str, secret: str, algorithm: str) -> dict[str, Any]:
 def role_from_payload(payload: dict[str, Any]) -> str:
     """Role from JWT payload; if missing or invalid, return 'owner' for backward compatibility."""
     r = payload.get("role")
-    return r if r in ("owner", "partner") else "owner"
+    return r if r in ("owner", "partner", "viewer") else "owner"

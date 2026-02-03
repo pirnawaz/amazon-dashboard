@@ -70,5 +70,22 @@ class Settings:
     # Sprint 14: attribution lookback days for purchased product / advertised product reports
     amazon_ads_attribution_lookback_days: int = int(os.getenv("AMAZON_ADS_ATTRIBUTION_LOOKBACK_DAYS", "30"))
 
+    # Sprint 18: default Amazon account label (multi-account groundwork)
+    default_amazon_account_name: str = os.getenv("DEFAULT_AMAZON_ACCOUNT_NAME", "Default")
+
+    # Sprint 17: ops health and notifications
+    orders_stale_hours: int = int(os.getenv("ORDERS_STALE_HOURS", "12"))
+    ads_stale_hours: int = int(os.getenv("ADS_STALE_HOURS", "24"))
+    notifications_retry_max: int = int(os.getenv("NOTIFICATIONS_RETRY_MAX", "3"))
+    enable_notifications: bool = (os.getenv("ENABLE_NOTIFICATIONS", "true").strip().lower() in ("true", "1", "yes"))
+    enable_ops_health_checks: bool = (
+        os.getenv("ENABLE_OPS_HEALTH_CHECKS", "true").strip().lower() in ("true", "1", "yes")
+    )
+
+    # Sprint 19: performance and observability
+    slow_query_ms: int = int(os.getenv("SLOW_QUERY_MS", "2000"))
+    dashboard_default_days: int = int(os.getenv("DASHBOARD_DEFAULT_DAYS", "90"))
+    cache_ttl_seconds: int = int(os.getenv("CACHE_TTL_SECONDS", "60"))
+
 
 settings = Settings()

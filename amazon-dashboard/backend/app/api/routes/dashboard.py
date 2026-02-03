@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.cache import cache_get, cache_set
+from app.core.config import settings
 from app.api.routes.me import get_current_user
 from app.db.session import get_db
 from app.models.ad_spend_daily import AdSpendDaily
@@ -20,11 +22,18 @@ router = APIRouter()
 
 @router.get("/dashboard/summary", response_model=DashboardSummary)
 def dashboard_summary(
-    days: int = Query(default=30, ge=1, le=365),
+    days: int = Query(default=None, ge=1, le=365),
     marketplace: str = Query(default="ALL"),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> DashboardSummary:
+    if days is None:
+        days = settings.dashboard_default_days
+    cache_key = f"dashboard_summary:{marketplace}:{days}"
+    hit = cache_get(cache_key)
+    if hit is not None:
+        return hit  # type: ignore[return-value]
+
     end_date = date.today()
     start_date = end_date - timedelta(days=days - 1)
 
@@ -57,10 +66,12 @@ def dashboard_summary(
     ad_spend = Decimal(str(ad_row.spend))
     net_profit_placeholder = revenue - ad_spend
 
-    return DashboardSummary(
+    result = DashboardSummary(
         revenue=revenue,
         units=int(order_row.units),
         orders=int(order_row.orders),
         ad_spend=ad_spend,
         net_profit_placeholder=net_profit_placeholder,
     )
+    cache_set(cache_key, result)
+    return result

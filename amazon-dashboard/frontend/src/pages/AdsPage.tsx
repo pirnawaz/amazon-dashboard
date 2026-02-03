@@ -35,8 +35,10 @@ type Props = {
 };
 
 export default function AdsPage({ token }: Props) {
+  const { user } = useAuth();
   const { showToast } = useToast();
   const { isDemoMode: demoMode } = useDemo();
+  const isViewer = user?.role === "viewer";
   const [days, setDays] = useState<number>(30);
   const [marketplace, setMarketplace] = useState<string>("ALL");
   const [summary, setSummary] = useState<AdsDashboardSummaryType | null>(null);
@@ -168,7 +170,7 @@ export default function AdsPage({ token }: Props) {
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-6)" }}>
         <EmptyState
           title="No Ads data"
-          description="Connect an Ads account in Admin or load sample data to see spend, sales, ACOS, and ROAS."
+          description="No Ads account connected. Ask the owner to connect Ads in Admin, or load sample data to see spend, sales, ACOS, and ROAS."
           action={
             <button
               type="button"
@@ -259,7 +261,8 @@ export default function AdsPage({ token }: Props) {
           <button
             type="button"
             onClick={handleSync}
-            disabled={syncing}
+            disabled={syncing || isViewer}
+            title={isViewer ? "Read-only account" : undefined}
             style={{
               padding: "var(--space-2) var(--space-4)",
               backgroundColor: "var(--color-primary)",
@@ -267,8 +270,8 @@ export default function AdsPage({ token }: Props) {
               border: "none",
               borderRadius: "var(--radius-md)",
               fontWeight: "var(--font-medium)",
-              cursor: syncing ? "wait" : "pointer",
-              opacity: syncing ? 0.7 : 1,
+              cursor: syncing || isViewer ? "not-allowed" : "pointer",
+              opacity: syncing || isViewer ? 0.7 : 1,
             }}
           >
             {syncing ? "Syncing…" : "Sync Ads"}
@@ -316,7 +319,7 @@ export default function AdsPage({ token }: Props) {
         <ChartContainer title="Spend & Sales by date">
           <EmptyState
             title="No time series data"
-            description="Run Sync Ads or connect an Ads account in Admin to see data by date."
+            description="No Ads account connected. Ask the owner to connect Ads or run Sync Ads to see data by date."
           />
         </ChartContainer>
       )}

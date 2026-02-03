@@ -19,6 +19,11 @@ class AdsAccount(Base):
     __tablename__ = "ads_account"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    amazon_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("amazon_account.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

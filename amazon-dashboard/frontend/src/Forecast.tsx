@@ -3,12 +3,14 @@ import { Link } from "react-router-dom";
 import {
   LineChart,
   Line,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
   ResponsiveContainer,
   Legend,
+  ComposedChart,
 } from "recharts";
 import {
   forecastTotal,
@@ -100,6 +102,7 @@ export default function Forecast({ token }: Props) {
       history_days: historyDays,
       horizon_days: horizonDays,
       marketplace,
+      include_unmapped: mode === "sku" ? includeUnmapped : undefined,
     };
     if (isDemoMode()) {
       const demoData =
@@ -182,6 +185,10 @@ export default function Forecast({ token }: Props) {
     predicted: p.predicted_units,
   }));
   const forecastPoints = data?.forecast_points ?? [];
+  const confidenceBounds = data?.confidence_bounds ?? [];
+  const boundsByDate = Object.fromEntries(
+    confidenceBounds.map((b) => [b.date, { lower: b.lower, upper: b.upper }])
+  );
   const actualByDate = Object.fromEntries(actualLast60.map((p) => [p.date, p.units]));
   const forecastByDate = Object.fromEntries(forecastPoints.map((p) => [p.date, p.units]));
   const allDates = [
@@ -189,12 +196,21 @@ export default function Forecast({ token }: Props) {
     ...forecastPoints.map((p) => p.date),
   ].filter((d, i, arr) => arr.indexOf(d) === i);
   allDates.sort();
-  const chartData = allDates.map((date) => ({
-    date,
-    dateLabel: formatShortDate(date),
-    actual: actualByDate[date] ?? undefined,
-    forecast: forecastByDate[date] ?? undefined,
-  }));
+  const chartData = allDates.map((date) => {
+    const lower = boundsByDate[date]?.lower;
+    const upper = boundsByDate[date]?.upper;
+    const bandRange =
+      lower != null && upper != null && upper >= lower ? upper - lower : undefined;
+    return {
+      date,
+      dateLabel: formatShortDate(date),
+      actual: actualByDate[date] ?? undefined,
+      forecast: forecastByDate[date] ?? undefined,
+      lower: lower ?? undefined,
+      upper: upper ?? undefined,
+      bandRange,
+    };
+  });
 
   if (error) {
     return (
@@ -310,6 +326,23 @@ export default function Forecast({ token }: Props) {
         </div>
       )}
 
+      {data.drift?.flag && (
+        <div
+          style={{
+            padding: "var(--space-3) var(--space-4)",
+            backgroundColor: "var(--color-warning-muted)",
+            color: "var(--color-warning)",
+            borderRadius: "var(--radius-md)",
+            fontSize: "var(--text-sm)",
+            border: "1px solid var(--color-warning)",
+          }}
+          role="alert"
+        >
+          <strong>Forecast drift detected</strong> in the last {data.drift.window_days} days. MAE:{" "}
+          {formatDecimal(data.drift.mae, 2)} · MAPE: {formatPercent(data.drift.mape)} (threshold:{" "}
+          {formatPercent(data.drift.threshold)}). Consider reviewing recent demand or overrides.
+        </div>
+      )}
       {data.warnings && data.warnings.length > 0 && (
         <div
           style={{
@@ -703,11 +736,11 @@ export default function Forecast({ token }: Props) {
 
             <ChartContainer
               title="Details — Forecast"
-              subtitle="Actual and forecasted units"
+              subtitle="Actual and forecasted units with confidence band"
               dataThroughDate={data.data_end_date}
             >
               <ResponsiveContainer width="100%" height={360}>
-                <LineChart data={chartData} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
+                <ComposedChart data={chartData} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis
                     dataKey="dateLabel"
@@ -731,6 +764,25 @@ export default function Forecast({ token }: Props) {
                     }
                   />
                   <Legend />
+                  {confidenceBounds.length > 0 && (
+                    <>
+                      <Area
+                        type="monotone"
+                        dataKey="lower"
+                        stackId="band"
+                        fill="transparent"
+                        stroke="none"
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="bandRange"
+                        stackId="band"
+                        fill="var(--color-primary-muted)"
+                        fillOpacity={0.25}
+                        stroke="none"
+                      />
+                    </>
+                  )}
                   <Line
                     type="monotone"
                     dataKey="actual"
@@ -748,7 +800,29 @@ export default function Forecast({ token }: Props) {
                     dot={false}
                     connectNulls
                   />
-                </LineChart>
+                  {confidenceBounds.length > 0 && (
+                    <>
+                      <Line
+                        type="monotone"
+                        dataKey="lower"
+                        name="Lower bound"
+                        stroke="var(--color-text-muted)"
+                        strokeDasharray="2 2"
+                        dot={false}
+                        connectNulls
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="upper"
+                        name="Upper bound"
+                        stroke="var(--color-text-muted)"
+                        strokeDasharray="2 2"
+                        dot={false}
+                        connectNulls
+                      />
+                    </>
+                  )}
+                </ComposedChart>
               </ResponsiveContainer>
             </ChartContainer>
           </div>
