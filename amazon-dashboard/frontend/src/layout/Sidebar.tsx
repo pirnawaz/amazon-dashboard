@@ -15,6 +15,12 @@ const SIDEBAR_GROUPS_BASE: { label: string; items: NavItem[] }[] = [
     ],
   },
   {
+    label: "Ads",
+    items: [
+      { to: "/ads/attribution", label: "Attribution" },
+    ],
+  },
+  {
     label: "Inventory",
     items: [
       { to: "/inventory", label: "Inventory" },

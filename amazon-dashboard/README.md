@@ -4,14 +4,14 @@ Production-ready Amazon Seller dashboard for shared users on a single DigitalOce
 
 ## Project status
 
-- **Completed:** Sprints 1–6 (foundation, dashboard, restock, forecasting baseline); Sprints 7–8 (owner/partner roles, audit log, alert settings, inventory, alerts, restock actions); Phase 9 (SP-API connection + token encryption); Phase 10 (SP-API orders sync); Sprint 11 (Insights/UX + Phase 11.4/11.5 inventory freshness and restock source-of-truth); Phase 12 (catalog mapping, data health, mapped demand, CSV export/import, unmapped suggestions).
-- **Remaining:** Phase 13 (next). Nothing else is listed as remaining unless you have a separate roadmap.
+- **Completed:** Sprints 1–6 (foundation, dashboard, restock, forecasting baseline); Sprints 7–8 (owner/partner roles, audit log, alert settings, inventory, alerts, restock actions); Phase 9 (SP-API connection + token encryption); Phase 10 (SP-API orders sync); Sprint 11 (Insights/UX + Phase 11.4/11.5 inventory freshness and restock source-of-truth); Phase 12 (catalog mapping, data health, mapped demand, CSV export/import, unmapped suggestions); **Sprint 14** (Ads attribution + SKU profitability).
+- **Remaining:** Sprints 15–20.
 
 See [docs/CHANGELOG.md](docs/CHANGELOG.md) and phase docs in `docs/` (PHASE9_*.md, PHASE10_ORDERS_SYNC.md, PHASE11_*.md, PHASE12_CATALOG_MAPPING.md).
 
 ### Sprint ↔ Phase mapping
 
-| Sprints | Phase | What’s implemented |
+| Sprints | Phase | What's implemented |
 |--------|-------|---------------------|
 | **1–6** | — | Foundation, dashboard, restock, forecasting baseline |
 | **7–8** | — | Roles, audit log, alert settings, inventory, alerts, restock actions (already in code) |
@@ -19,6 +19,7 @@ See [docs/CHANGELOG.md](docs/CHANGELOG.md) and phase docs in `docs/` (PHASE9_*.m
 | **10** | **Phase 10** | Orders sync (SP-API), worker, admin orders sync; deployment/worker ops (BACKUPS, DEPLOYMENT, OPERATIONS) |
 | **11** | **Phase 11.4 / 11.5** | Insights/UX; inventory freshness; restock uses `inventory_levels` as source of truth |
 | **11** (overlap) | **Phase 12** | Catalog mapping, data health, mapped demand, CSV tooling (merged into same tree) |
+| **14** | **Sprint 14** | Ads attribution, SKU profitability (revenue, ad spend, COGS, net profit, ACOS/ROAS) |
 
 ## Tech stack
 
@@ -64,6 +65,12 @@ amazon-dashboard/
 - **Inventory:** `GET /api/inventory`, `GET /api/inventory/:marketplace/:sku`, `PUT /api/inventory`, `DELETE /api/inventory/:marketplace/:sku`
 - **Alerts:** `GET /api/alerts`, `POST /api/alerts/ack`, `GET /api/alerts/settings`, `PUT /api/alerts/settings` (owner only), `POST /api/alerts/run` (owner only)
 - **Admin:** `GET /api/admin/audit-log?limit=50&offset=0` (owner only)
+- **Ads Attribution (Sprint 14):**
+  - `GET /api/ads/attribution/sku-profitability?days=30&marketplace=US` — SKU profitability table
+  - `GET /api/ads/attribution/sku-timeseries?sku=...&days=30&marketplace=US` — Timeseries for a single SKU
+  - `GET /api/ads/attribution/sku-costs` — List SKU costs/COGS (owner only)
+  - `POST /api/ads/attribution/sku-costs` — Upsert SKU cost (owner only)
+  - `DELETE /api/ads/attribution/sku-costs/{sku}` — Delete SKU cost (owner only)
 
 Swagger docs at **http://localhost/docs** when running.
 
@@ -129,7 +136,7 @@ Use this to confirm the app and phases work end-to-end (beginner-friendly).
    - From `amazon-dashboard`: `docker compose up -d`. App at **http://localhost**; API at **http://localhost/api**, Swagger at **http://localhost/docs**.
 
 2. **Migrations apply**
-   - `docker compose run --rm backend python -m alembic upgrade head` (or `.\run_migration_docker.ps1`). Check: `alembic current` shows latest revision (e.g. `0015`).
+   - `docker compose run --rm backend python -m alembic upgrade head` (or `.\run_migration_docker.ps1`). Check: `alembic current` shows latest revision (e.g. `0016`).
 
 3. **Login as owner**
    - Register or log in; first user is owner. `GET /api/me` returns `role: "owner"`.
@@ -145,3 +152,15 @@ Use this to confirm the app and phases work end-to-end (beginner-friendly).
 
 7. **Forecast/restock endpoints return `data_quality` / mapped fields**
    - `GET /api/forecast/total?include_unmapped=false` and `GET /api/forecast/restock-plan` (with marketplace/SKU as needed). Responses should include `data_quality` (or mapping health) where implemented (Phase 12.2/12.3).
+
+8. **Sprint 14 – Ads Attribution + SKU Profitability**
+   - `docker compose up -d --build`
+   - `docker compose run --rm backend python -m alembic upgrade head` reaches revision `0016` and tables exist:
+     - `ads_attributed_daily`
+     - `sku_cost`
+   - Navigate to **Ads → Attribution** in the sidebar
+   - Page loads without console errors
+   - `GET /api/ads/attribution/sku-profitability?days=30&marketplace=ALL` returns rows (demo or real)
+   - `GET /api/ads/attribution/sku-timeseries?sku=DEMO-SKU-001&days=30&marketplace=ALL` returns points
+   - Warnings appear for missing COGS/attribution (warning_flags) rather than failures
+   - Click a SKU row to see the timeseries chart (Revenue, Attributed Sales, Ad Spend, Net Profit)

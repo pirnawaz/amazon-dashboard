@@ -95,6 +95,14 @@ export const ROUTE_META: Record<string, RouteMeta> = {
       { label: "Data Health", path: "/admin/data-health" },
     ],
   },
+  "/ads/attribution": {
+    title: "Ads Attribution",
+    description: "SKU profitability: revenue, ad spend, COGS, net profit, ACOS/ROAS.",
+    breadcrumbs: [
+      { label: "Ads", path: "/ads/attribution" },
+      { label: "Attribution", path: "/ads/attribution" },
+    ],
+  },
 };
 
 export function getRouteMeta(pathname: string): RouteMeta {

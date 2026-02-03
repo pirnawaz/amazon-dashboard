@@ -27,6 +27,7 @@ from app.api.routes.admin_data_health import router as admin_data_health_router
 from app.api.routes.alerts import router as alerts_router
 from app.api.routes.amazon import router as amazon_router
 from app.api.restock import router as restock_router
+from app.api.routes.ads_attribution import router as ads_attribution_router
 from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.request_logging import RequestLoggingMiddleware
 from app.middleware.rate_limit import RateLimitMiddleware
@@ -133,5 +134,6 @@ app.include_router(admin_data_health_router, prefix="/api")
 app.include_router(alerts_router, prefix="/api")
 app.include_router(amazon_router, prefix="/api")
 app.include_router(restock_router, prefix="/api")
+app.include_router(ads_attribution_router, prefix="/api")
 
 logger.info("Starting app in %s mode", settings.app_env)

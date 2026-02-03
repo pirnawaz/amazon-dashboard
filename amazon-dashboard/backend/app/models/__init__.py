@@ -12,3 +12,5 @@ from .inventory_snapshot import InventorySnapshot  # noqa: F401
 from .inventory import InventoryLevel  # noqa: F401
 from .alerts import AlertEvent, AlertSettings  # noqa: F401
 from .sku_mapping import SkuMapping  # noqa: F401
+from .ads_attributed_daily import AdsAttributedDaily  # noqa: F401
+from .sku_cost import SkuCost  # noqa: F401

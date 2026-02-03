@@ -643,3 +643,168 @@ export function updateDemoAlertSettings(patch: AlertSettingsUpdateRequest): Aler
   demoAlertSettingsStore.updated_at = new Date().toISOString();
   return getDemoAlertSettings();
 }
+
+// ——— Demo Ads Attribution (Sprint 14) ———
+
+import type {
+  SkuProfitabilityResponse,
+  SkuProfitabilityRow,
+  SkuTimeseriesResponse,
+  SkuTimeseriesPoint,
+} from "../api";
+
+const DEMO_SKU_PROFITABILITY: SkuProfitabilityRow[] = [
+  {
+    sku: "DEMO-SKU-001",
+    marketplace_code: "US",
+    revenue: 8200,
+    ad_spend: 820,
+    attributed_sales: 4100,
+    organic_sales: 4100,
+    units_sold: 240,
+    unit_cogs: 12.5,
+    total_cogs: 3000,
+    gross_profit: 5200,
+    net_profit: 4380,
+    acos: 0.2,
+    roas: 5.0,
+    warning_flags: [],
+  },
+  {
+    sku: "DEMO-SKU-002",
+    marketplace_code: "US",
+    revenue: 6500,
+    ad_spend: 975,
+    attributed_sales: 3250,
+    organic_sales: 3250,
+    units_sold: 180,
+    unit_cogs: 15.0,
+    total_cogs: 2700,
+    gross_profit: 3800,
+    net_profit: 2825,
+    acos: 0.3,
+    roas: 3.33,
+    warning_flags: [],
+  },
+  {
+    sku: "DEMO-SKU-003",
+    marketplace_code: "US",
+    revenue: 4200,
+    ad_spend: 630,
+    attributed_sales: null,
+    organic_sales: null,
+    units_sold: 120,
+    unit_cogs: null,
+    total_cogs: null,
+    gross_profit: null,
+    net_profit: null,
+    acos: null,
+    roas: 6.67,
+    warning_flags: ["missing_cogs", "missing_attribution"],
+  },
+  {
+    sku: "DEMO-SKU-004",
+    marketplace_code: "UK",
+    revenue: 3800,
+    ad_spend: 570,
+    attributed_sales: 1900,
+    organic_sales: 1900,
+    units_sold: 95,
+    unit_cogs: 18.0,
+    total_cogs: 1710,
+    gross_profit: 2090,
+    net_profit: 1520,
+    acos: 0.3,
+    roas: 3.33,
+    warning_flags: [],
+  },
+  {
+    sku: "DEMO-SKU-005",
+    marketplace_code: "DE",
+    revenue: 2750,
+    ad_spend: 413,
+    attributed_sales: 1375,
+    organic_sales: 1375,
+    units_sold: 78,
+    unit_cogs: 14.0,
+    total_cogs: 1092,
+    gross_profit: 1658,
+    net_profit: 1245,
+    acos: 0.3,
+    roas: 3.33,
+    warning_flags: [],
+  },
+];
+
+export function getDemoSkuProfitability(params: {
+  days: number;
+  marketplace: string;
+}): SkuProfitabilityResponse {
+  let items = [...DEMO_SKU_PROFITABILITY];
+  if (params.marketplace !== "ALL") {
+    items = items.filter((i) => i.marketplace_code === params.marketplace);
+  }
+  // Scale revenue by days factor (demo effect)
+  const daysFactor = params.days / 30;
+  items = items.map((i) => ({
+    ...i,
+    revenue: Math.round(i.revenue * daysFactor),
+    ad_spend: i.ad_spend ? Math.round(i.ad_spend * daysFactor) : null,
+    attributed_sales: i.attributed_sales ? Math.round(i.attributed_sales * daysFactor) : null,
+    organic_sales: i.organic_sales ? Math.round(i.organic_sales * daysFactor) : null,
+    units_sold: Math.round(i.units_sold * daysFactor),
+    total_cogs: i.total_cogs ? Math.round(i.total_cogs * daysFactor) : null,
+    gross_profit: i.gross_profit ? Math.round(i.gross_profit * daysFactor) : null,
+    net_profit: i.net_profit ? Math.round(i.net_profit * daysFactor) : null,
+  }));
+  return {
+    days: params.days,
+    marketplace: params.marketplace,
+    items,
+  };
+}
+
+export function getDemoSkuProfitabilityTimeseries(params: {
+  sku: string;
+  days: number;
+  marketplace: string;
+}): SkuTimeseriesResponse {
+  const baseRow = DEMO_SKU_PROFITABILITY.find((r) => r.sku === params.sku);
+  const dailyRevBase = (baseRow?.revenue ?? 200) / 30;
+  const dailyAdSpend = (baseRow?.ad_spend ?? 20) / 30;
+  const dailyAttrSales = baseRow?.attributed_sales ? baseRow.attributed_sales / 30 : null;
+  const dailyUnits = Math.round((baseRow?.units_sold ?? 6) / 30);
+  const unitCogs = baseRow?.unit_cogs ?? null;
+
+  const points: SkuTimeseriesPoint[] = [];
+  const d = new Date();
+  for (let i = params.days - 1; i >= 0; i--) {
+    const date = new Date(d);
+    date.setDate(date.getDate() - i);
+    const dateStr = date.toISOString().slice(0, 10);
+    const variance = 0.8 + Math.random() * 0.4;
+    const revenue = Math.round(dailyRevBase * variance);
+    const adSpend = Math.round(dailyAdSpend * variance);
+    const attrSales = dailyAttrSales ? Math.round(dailyAttrSales * variance) : null;
+    const units = Math.max(1, Math.round(dailyUnits * variance));
+    let netProfit: number | null = null;
+    if (unitCogs != null) {
+      const cogs = unitCogs * units;
+      netProfit = revenue - cogs - adSpend;
+    }
+    points.push({
+      date: dateStr,
+      revenue,
+      ad_spend: adSpend,
+      attributed_sales: attrSales,
+      net_profit: netProfit,
+      units,
+    });
+  }
+  return {
+    sku: params.sku,
+    days: params.days,
+    marketplace: params.marketplace,
+    points,
+  };
+}

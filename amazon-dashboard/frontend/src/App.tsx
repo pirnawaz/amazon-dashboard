@@ -18,6 +18,7 @@ import AmazonConnection from "./pages/AmazonConnection";
 import AuditLog from "./pages/AuditLog";
 import CatalogMappingPage from "./pages/admin/CatalogMappingPage";
 import DataHealthPage from "./pages/admin/DataHealthPage";
+import AdsAttributionPage from "./pages/AdsAttributionPage";
 
 const SESSION_EXPIRED_KEY = "seller-hub-session-expired";
 
@@ -245,6 +246,7 @@ function AppRoutes() {
         <Route path="restock/inventory" element={<RestockRoute />} />
         <Route path="restock/planner" element={<RestockPlannerRoute />} />
         <Route path="alerts" element={<AlertsRoute />} />
+        <Route path="ads/attribution" element={<AdsAttributionRoute />} />
         <Route path="settings" element={<Settings />} />
         <Route
           path="settings/alerts"
@@ -334,6 +336,10 @@ function CatalogMappingRoute() {
 function DataHealthRoute() {
   const { token } = useAuth();
   return token ? <DataHealthPage /> : null;
+}
+function AdsAttributionRoute() {
+  const { token } = useAuth();
+  return token ? <AdsAttributionPage /> : null;
 }
 
 export default function App() {
