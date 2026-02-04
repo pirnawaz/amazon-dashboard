@@ -7,6 +7,7 @@ import {
   getRestockSuppliers,
   type RestockRecommendationRowOut,
   type RestockWhatIfRequest,
+  type UserRole,
 } from "../api";
 import Card from "../components/ui/Card";
 import LoadingSkeleton from "../components/ui/LoadingSkeleton";
@@ -21,7 +22,7 @@ const MARKETPLACE_OPTIONS = ["US", "UK", "DE", "ALL"] as const;
 
 type Props = {
   token: string;
-  userRole?: "owner" | "partner";
+  userRole?: UserRole;
 };
 
 export default function RestockAdvancedPage({ token, userRole }: Props) {
@@ -242,7 +243,7 @@ export default function RestockAdvancedPage({ token, userRole }: Props) {
           Restock recommendations {isDemoMode() ? "(demo)" : ""}
         </h2>
         {loading ? (
-          <LoadingSkeleton rows={8} />
+          <LoadingSkeleton count={8} />
         ) : rows.length === 0 ? (
           <EmptyState
             title="No recommendations"

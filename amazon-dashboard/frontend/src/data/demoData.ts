@@ -110,9 +110,9 @@ export function getDemoTopProducts(params: { days: number; marketplace: string; 
 }
 
 const DEMO_RESTOCK_ITEMS: RestockRow[] = [
-  { sku: "DEMO-SKU-001", title: "Demo Product A", asin: "B0DEMO01", on_hand: 12, avg_daily_units: 5.2, days_of_cover: 2.3, reorder_qty: 180, risk_level: "CRITICAL" },
-  { sku: "DEMO-SKU-002", title: "Demo Product B", asin: "B0DEMO02", on_hand: 28, avg_daily_units: 4.0, days_of_cover: 7.0, reorder_qty: 140, risk_level: "OK" },
-  { sku: "DEMO-SKU-003", title: "Demo Product C", asin: "B0DEMO03", on_hand: 8, avg_daily_units: 2.7, days_of_cover: 3.0, reorder_qty: 95, risk_level: "LOW" },
+  { sku: "DEMO-SKU-001", title: "Demo Product A", asin: "B0DEMO01", on_hand: 12, avg_daily_units: 5.2, days_of_cover: 2.3, reorder_qty: 180, risk_level: "CRITICAL", inventory_source: null },
+  { sku: "DEMO-SKU-002", title: "Demo Product B", asin: "B0DEMO02", on_hand: 28, avg_daily_units: 4.0, days_of_cover: 7.0, reorder_qty: 140, risk_level: "OK", inventory_source: null },
+  { sku: "DEMO-SKU-003", title: "Demo Product C", asin: "B0DEMO03", on_hand: 8, avg_daily_units: 2.7, days_of_cover: 3.0, reorder_qty: 95, risk_level: "LOW", inventory_source: null },
 ];
 
 export function getDemoRestock(params: { days: number; target_days: number; marketplace: string; limit: number }): RestockResponse {
@@ -236,7 +236,9 @@ export function getDemoForecastTopSkus(params: { days: number; marketplace: stri
   return DEMO_SKUS.slice(0, Math.min(params.limit, DEMO_SKUS.length)).map((p) => ({
     sku: p.sku,
     title: p.title ?? p.sku,
-    revenue: p.revenue,
+    asin: p.asin,
+    total_units: p.units,
+    avg_daily: p.units / 30,
   }));
 }
 
@@ -257,6 +259,13 @@ export function getDemoForecastRestockPlan(params: {
     forecast_units_lead_time: 58.8,
     safety_stock_units: 18,
     recommended_reorder_qty: 77,
+    inventory_freshness: null,
+    inventory_age_hours: null,
+    inventory_as_of_at: null,
+    inventory_warning_message: null,
+    inventory_source: null,
+    no_inventory_data: false,
+    data_quality: null,
   };
 }
 
@@ -282,6 +291,9 @@ export function getDemoRestockPlan(params: {
     days_of_cover: params.current_inventory != null ? params.current_inventory / 4.2 : null,
     expected_stockout_date: params.current_inventory != null ? dataEnd : null,
     stockout_before_lead_time: params.current_inventory != null && params.current_inventory < 60 ? true : null,
+    no_inventory_data: false,
+    inventory_source: null,
+    data_quality: null,
   };
 }
 
@@ -522,6 +534,10 @@ function demoRestockActionItem(
     status,
     recommendation,
     reasoning,
+    inventory_freshness: null,
+    inventory_age_hours: null,
+    inventory_as_of_at: null,
+    inventory_warning_message: null,
     ...overrides,
   };
 }
@@ -548,6 +564,7 @@ export function getDemoRestockActionsTotal(params: {
   return {
     generated_at: new Date().toISOString(),
     items: [item],
+    data_quality: null,
   };
 }
 
@@ -576,6 +593,7 @@ export function getDemoRestockActionsSku(
   return {
     generated_at: new Date().toISOString(),
     items: [item],
+    data_quality: null,
   };
 }
 
@@ -612,6 +630,9 @@ function toDemoInventoryItem(
     created_at,
     freshness_days: fd,
     is_stale: fd >= STALE_DAYS,
+    as_of_at: null,
+    inventory_freshness: "unknown",
+    inventory_age_hours: null,
   };
 }
 

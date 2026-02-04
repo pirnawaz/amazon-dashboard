@@ -157,7 +157,7 @@ export default function AmazonAccountsPage({ token }: Props) {
         <Card>
           <EmptyState
             title="No Amazon accounts"
-            message="Add an Amazon account to organize integrations (SP-API, Ads) by account. Use “Add Amazon account” to create one."
+            description="Add an Amazon account to organize integrations (SP-API, Ads) by account. Use “Add Amazon account” to create one."
           />
         </Card>
       ) : (

@@ -71,7 +71,7 @@ export default function Inventory({ token }: Props) {
       setLoading(false);
       return;
     }
-    getInventoryList(token, params)
+    getInventoryList(token, { marketplace: params.marketplace ?? "", q: params.q })
       .then(setData)
       .catch((err: unknown) =>
         setError(err instanceof Error ? err.message : "Failed to load inventory")

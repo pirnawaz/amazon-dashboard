@@ -11,6 +11,7 @@ import {
   type AmazonConnectionUpsertRequest,
   type AmazonCredentialSafeResponse,
   type ConnectionStatus,
+  type InventorySyncFreshness,
 } from "../api";
 import Card from "../components/ui/Card";
 import EmptyState from "../components/ui/EmptyState";
@@ -152,9 +153,6 @@ const INVENTORY_SYNC_STATUS_STYLES: Record<
   ERROR: { bg: "var(--color-error-muted)", text: "var(--color-error)", label: "ERROR" },
 };
 
-/** Phase 11.4: Inventory sync freshness for display. */
-type InventorySyncFreshness = "unknown" | "fresh" | "warning" | "critical";
-
 const INVENTORY_FRESHNESS_STYLES: Record<
   InventorySyncFreshness,
   { bg: string; text: string; label: string }
@@ -281,10 +279,10 @@ export default function AmazonConnectionPage() {
     setError(null);
     adminSpapiPing(token)
       .then((res) => {
-        if (res.ok) {
+        if (res.status === "active") {
           showToast("SP-API check OK", "info");
         } else {
-          showToast(res.error ?? "Check failed", "error");
+          showToast("Check failed", "error");
         }
         load();
       })

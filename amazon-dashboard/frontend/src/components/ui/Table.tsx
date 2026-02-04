@@ -20,7 +20,7 @@ type Props<T> = {
   onRowClick?: (row: T) => void;
 };
 
-export default function Table<T extends Record<string, unknown>>({
+export default function Table<T extends object>({
   columns,
   data,
   getRowKey,
@@ -128,7 +128,7 @@ export default function Table<T extends Record<string, unknown>>({
                 >
                   {col.render != null
                     ? col.render(row)
-                    : String(row[col.key as keyof T] ?? "—")}
+                    : String((row as Record<string, unknown>)[col.key as string] ?? "—")}
                 </td>
               ))}
             </tr>

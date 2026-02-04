@@ -41,7 +41,7 @@ export type ForecastTableRow = {
 
 type SortKey = "confidence" | "expected" | "name";
 
-const CONFIDENCE_ORDER = { high: 0, medium: 1, low: 2 } as const;
+const CONFIDENCE_ORDER: Record<ConfidenceType, number> = { high: 0, medium: 1, low: 2 };
 
 function sortRows(rows: ForecastTableRow[], sortKey: SortKey, asc: boolean): ForecastTableRow[] {
   const sorted = [...rows].sort((a, b) => {
@@ -181,7 +181,7 @@ export default function ForecastTable({ rows: initialRows }: Props) {
       key: "why",
       header: "Why?",
       render: (row: ForecastTableRow) => (
-        <ExpandableReasoning reasoning={row.forecast.reasoning} />
+        <ExpandableReasoning reasoning={row.forecast.reasoning ?? []} />
       ),
     },
   ];

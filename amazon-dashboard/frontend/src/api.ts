@@ -379,12 +379,13 @@ export function getSkuProfitabilityTimeseries(
 
 // --- Audit log ---
 export interface AuditLogEntry {
-  id: number;
+  id: string;
   created_at: string;
   actor_user_id: number;
+  actor_email: string | null;
   action: string;
   resource_type: string;
-  resource_id: string;
+  resource_id: string | null;
   metadata: Record<string, unknown> | null;
 }
 
@@ -465,21 +466,24 @@ export function getHealthNotifications(
 // --- Alerts ---
 export interface AlertEventResponse {
   id: number;
-  created_at: string;
   alert_type: string;
   severity: string;
+  sku: string | null;
+  marketplace: string | null;
   title: string;
   message: string;
+  is_acknowledged: boolean;
   acknowledged_at: string | null;
-  metadata: Record<string, unknown> | null;
+  created_at: string;
 }
 
 export interface AlertListResponse {
   items: AlertEventResponse[];
-  total: number;
 }
 
 export interface AlertSettingsResponse {
+  email_enabled: boolean;
+  email_recipients: string | null;
   send_inventory_stale: boolean;
   send_urgent_restock: boolean;
   send_reorder_soon: boolean;
@@ -489,6 +493,8 @@ export interface AlertSettingsResponse {
 }
 
 export interface AlertSettingsUpdateRequest {
+  email_enabled?: boolean;
+  email_recipients?: string | null;
   send_inventory_stale?: boolean;
   send_urgent_restock?: boolean;
   send_reorder_soon?: boolean;
@@ -529,6 +535,8 @@ export function updateAlertSettings(
 // --- Amazon connection (SP-API) ---
 export type ConnectionStatus = "pending" | "active" | "error" | "disconnected";
 
+export type InventorySyncFreshness = "unknown" | "fresh" | "warning" | "critical";
+
 export interface AmazonConnectionResponse {
   id: number;
   created_at: string;
@@ -552,7 +560,7 @@ export interface AmazonConnectionResponse {
   last_inventory_sync_error: string | null;
   last_inventory_sync_items_count: number | null;
   last_inventory_sync_age_hours?: number | null;
-  last_inventory_sync_freshness?: string | null;
+  last_inventory_sync_freshness?: InventorySyncFreshness | null;
 }
 
 export interface AmazonConnectionUpsertRequest {
@@ -601,12 +609,26 @@ export function adminSpapiPing(token: string): Promise<{ status: ConnectionStatu
   return request("POST", "/amazon/connection/check", token);
 }
 
-export function adminOrdersSync(token: string): Promise<{ ok: boolean; message: string }> {
-  return request("POST", "/admin/amazon/orders/sync", token);
+export function adminOrdersSync(
+  token: string,
+  body?: { dry_run?: boolean; include_items?: boolean }
+): Promise<{ ok: boolean; error?: string }> {
+  return request("POST", "/admin/amazon/orders/sync", token, body ?? {});
 }
 
-export function adminInventorySync(token: string): Promise<{ ok: boolean; message: string }> {
-  return request("POST", "/admin/amazon/inventory/sync", token);
+export interface InventorySyncResponse {
+  status: string;
+  items_upserted: number;
+  last_inventory_sync_at: string | null;
+  last_inventory_sync_error: string | null;
+  error: string | null;
+}
+
+export function adminInventorySync(
+  token: string,
+  body?: { dry_run?: boolean }
+): Promise<InventorySyncResponse> {
+  return request("POST", "/admin/amazon/inventory/sync", token, body ?? {});
 }
 
 // --- Catalog mapping (Phase 12.1, 12.4) ---
@@ -842,6 +864,7 @@ export interface RestockRow {
   days_of_cover: number;
   reorder_qty: number;
   risk_level: string;
+  inventory_source: string | null;
 }
 
 export function restock(
@@ -861,8 +884,20 @@ export function restock(
 export interface RestockPlanResponse {
   sku: string;
   marketplace: string;
-  plan: unknown;
-  suggested_order_qty: number;
+  lead_time_days: number;
+  service_level: number;
+  data_end_date: string;
+  avg_daily_demand: number;
+  lead_time_demand: number;
+  safety_stock: number;
+  reorder_quantity: number;
+  mape_30d: number;
+  days_of_cover: number | null;
+  expected_stockout_date: string | null;
+  stockout_before_lead_time: boolean | null;
+  no_inventory_data: boolean;
+  inventory_source: string | null;
+  data_quality: DataQuality | null;
 }
 
 export function restockPlan(
@@ -877,22 +912,55 @@ export function suggestedSkus(token: string, marketplace: string): Promise<strin
 }
 
 // --- Restock actions ---
-export type RestockActionStatus = string;
+export type RestockActionStatus = "healthy" | "watch" | "urgent" | "insufficient_data";
+
+export interface DemandRangeDaily {
+  low: number;
+  expected: number;
+  high: number;
+}
 
 export interface RestockActionItem {
-  sku: string;
-  title: string | null;
-  asin: string | null;
-  marketplace: string;
+  sku: string | null;
+  marketplace: string | null;
+  horizon_days: number;
+  lead_time_days: number;
+  service_level: number;
+  current_stock_units: number | null;
+  daily_demand_estimate: number;
+  demand_range_daily: DemandRangeDaily;
+  days_of_cover_expected: number | null;
+  days_of_cover_low: number | null;
+  days_of_cover_high: number | null;
+  stockout_date_expected: string | null;
   order_by_date: string | null;
-  reorder_qty: number;
+  suggested_reorder_qty_expected: number;
+  suggested_reorder_qty_high: number;
   status: RestockActionStatus;
-  notes: string | null;
+  recommendation: string;
+  reasoning: string[];
+  inventory_freshness: "unknown" | "fresh" | "warning" | "critical" | null;
+  inventory_age_hours: number | null;
+  inventory_as_of_at: string | null;
+  inventory_warning_message: string | null;
+}
+
+export interface DataQuality {
+  mode: "mapped_confirmed" | "mapped_include_unmapped" | "legacy";
+  excluded_units: number;
+  excluded_skus: number;
+  unmapped_units_30d: number;
+  unmapped_share_30d: number;
+  ignored_units_30d: number;
+  discontinued_units_30d: number;
+  warnings: string[];
+  severity: "ok" | "warning" | "critical";
 }
 
 export interface RestockActionsResponse {
+  generated_at: string;
   items: RestockActionItem[];
-  total: number;
+  data_quality: DataQuality | null;
 }
 
 export function getRestockActionsTotal(
@@ -910,7 +978,7 @@ export function getRestockActionsSku(
   token: string,
   sku: string,
   params?: { marketplace?: string }
-): Promise<{ items: RestockActionItem[] }> {
+): Promise<RestockActionsResponse> {
   const q = params?.marketplace ? `?marketplace=${params.marketplace}` : "";
   return request("GET", `/restock/actions/sku/${encodeURIComponent(sku)}${q}`, token);
 }
@@ -959,15 +1027,15 @@ export interface ForecastTopSkuRow {
 }
 
 export interface ForecastIntelligence {
-  trend: string;
-  confidence: string;
+  trend: "increasing" | "stable" | "decreasing" | "insufficient_data";
+  confidence: "high" | "medium" | "low";
   daily_demand_estimate: number;
   volatility_cv: number;
   forecast_range: { low: number; expected: number; high: number };
 }
 
 export interface ForecastResponse {
-  kind: string;
+  kind: "total" | "sku";
   sku: string | null;
   marketplace: string;
   history_days: number;
@@ -981,7 +1049,7 @@ export interface ForecastResponse {
   forecast_points: ForecastPoint[];
   intelligence: ForecastIntelligence;
   recommendation: string;
-  reasoning?: string[];
+  reasoning: string[];
   excluded_units?: number | null;
   excluded_skus?: number | null;
   unmapped_units_30d?: number | null;
@@ -995,9 +1063,20 @@ export interface ForecastResponse {
 export interface ForecastRestockPlanResponse {
   sku: string;
   marketplace: string;
-  forecast: ForecastResponse;
-  reorder_qty: number;
-  order_by_date: string | null;
+  horizon_days: number;
+  lead_time_days: number;
+  service_level: number;
+  avg_daily_forecast_units: number;
+  forecast_units_lead_time: number;
+  safety_stock_units: number;
+  recommended_reorder_qty: number;
+  inventory_freshness: "unknown" | "fresh" | "warning" | "critical" | null;
+  inventory_age_hours: number | null;
+  inventory_as_of_at: string | null;
+  inventory_warning_message: string | null;
+  inventory_source: "spapi" | "manual" | "legacy" | null;
+  no_inventory_data: boolean;
+  data_quality: DataQuality | null;
 }
 
 export function getForecastTotal(
@@ -1041,7 +1120,11 @@ export function getForecastTopSkus(
   token: string,
   params: { days: number; marketplace: string; limit: number }
 ): Promise<ForecastTopSkuRow[]> {
-  const q = new URLSearchParams(params as Record<string, string>);
+  const q = new URLSearchParams({
+    days: String(params.days),
+    marketplace: params.marketplace,
+    limit: String(params.limit),
+  });
   return request("GET", `/forecast/top-skus?${q}`, token);
 }
 
@@ -1121,23 +1204,33 @@ export function deleteForecastOverride(token: string, id: number): Promise<void>
 
 // --- Inventory ---
 export interface InventoryItemResponse {
-  marketplace: string;
   sku: string;
-  quantity: number;
-  as_of_at: string | null;
-  created_at: string;
+  marketplace: string;
+  on_hand_units: number;
+  reserved_units: number;
+  available_units: number;
+  source: string;
+  note: string | null;
   updated_at: string;
+  created_at: string;
+  freshness_days: number;
+  is_stale: boolean;
+  as_of_at: string | null;
+  inventory_freshness: "unknown" | "fresh" | "warning" | "critical";
+  inventory_age_hours: number | null;
 }
 
 export interface InventoryListResponse {
-  marketplace: string;
   items: InventoryItemResponse[];
 }
 
 export interface InventoryUpsertRequest {
-  marketplace: string;
   sku: string;
-  quantity: number;
+  marketplace: string;
+  on_hand_units: number;
+  reserved_units?: number;
+  source?: string;
+  note?: string | null;
 }
 
 export function getInventoryList(

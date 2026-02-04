@@ -103,8 +103,10 @@ export default function AdsAttributionPage({ token }: Props) {
   const rows = data?.rows ?? [];
   const sortedRows = [...rows].sort((a, b) => {
     if (!sortBy.key) return 0;
-    const va = numOrNull(a[sortBy.key]);
-    const vb = numOrNull(b[sortBy.key]);
+    const rawA = a[sortBy.key as keyof SkuProfitabilityRow];
+    const rawB = b[sortBy.key as keyof SkuProfitabilityRow];
+    const va = numOrNull(Array.isArray(rawA) ? undefined : rawA);
+    const vb = numOrNull(Array.isArray(rawB) ? undefined : rawB);
     if (va == null && vb == null) return 0;
     if (va == null) return sortBy.dir === "asc" ? 1 : -1;
     if (vb == null) return sortBy.dir === "asc" ? -1 : 1;

@@ -63,15 +63,19 @@ export default function ForecastOverridesPage() {
     load();
   }, [load]);
 
-  const handleCreate = (body: ForecastOverrideCreate) => {
+  const handleCreate = (body: ForecastOverrideCreate | ForecastOverrideUpdate) => {
     if (isDemoMode()) {
       showToast("Demo: overrides are not persisted.", "info");
       setCreateOpen(false);
       return;
     }
     if (!token) return;
-    const start = body.start_date ? new Date(body.start_date).toISOString().slice(0, 10) : "";
-    const end = body.end_date ? new Date(body.end_date).toISOString().slice(0, 10) : "";
+    if (body.start_date == null || body.end_date == null || body.override_type == null || body.value == null) {
+      showToast("Missing required fields", "error");
+      return;
+    }
+    const start = new Date(body.start_date).toISOString().slice(0, 10);
+    const end = new Date(body.end_date).toISOString().slice(0, 10);
     if (start > end) {
       showToast("Start date must be <= end date", "error");
       return;
@@ -84,7 +88,15 @@ export default function ForecastOverridesPage() {
       showToast("Absolute value must be >= 0", "error");
       return;
     }
-    createForecastOverride(token, { ...body, start_date: start, end_date: end })
+    createForecastOverride(token, {
+      start_date: start,
+      end_date: end,
+      override_type: body.override_type,
+      value: body.value,
+      sku: body.sku ?? undefined,
+      marketplace_code: body.marketplace_code ?? undefined,
+      reason: body.reason ?? undefined,
+    })
       .then(() => {
         showToast("Override created", "success");
         setCreateOpen(false);

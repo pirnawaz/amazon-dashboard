@@ -166,11 +166,7 @@ export default function Forecast({ token }: Props) {
     }
     getForecastRestockPlan(token, {
       sku: effectiveSku,
-      horizon_days: horizonDays,
-      lead_time_days: leadTimeDays,
-      service_level: serviceLevel,
       marketplace,
-      include_unmapped: includeUnmapped,
     })
       .then(setRestockPlan)
       .catch(() => setRestockPlan(null));
@@ -556,7 +552,7 @@ export default function Forecast({ token }: Props) {
                 <option value="">— Select —</option>
                 {topSkus.map((r) => (
                   <option key={r.sku} value={r.sku}>
-                    {r.sku} ({r.title.slice(0, 30)}…)
+                    {r.sku} ({(r.title ?? r.sku).slice(0, 30)}…)
                   </option>
                 ))}
               </select>

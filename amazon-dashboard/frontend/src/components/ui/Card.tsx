@@ -1,11 +1,14 @@
 import type { ReactNode } from "react";
+import type { CSSProperties } from "react";
 
 type Props = {
   children: ReactNode;
   className?: string;
+  style?: CSSProperties;
+  title?: string;
 };
 
-export default function Card({ children, className = "" }: Props) {
+export default function Card({ children, className = "", style, title }: Props) {
   return (
     <div
       className={`card ${className}`.trim()}
@@ -15,7 +18,9 @@ export default function Card({ children, className = "" }: Props) {
         boxShadow: "var(--shadow-sm)",
         border: "1px solid var(--color-border)",
         overflow: "hidden",
+        ...style,
       }}
+      title={title}
     >
       {children}
     </div>
