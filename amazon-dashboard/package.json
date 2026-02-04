@@ -1,0 +1,11 @@
+{
+  "name": "amazon-dashboard",
+  "private": true,
+  "description": "Amazon Dashboard monorepo (backend + frontend). Run npm commands from frontend/ for the React app.",
+  "scripts": {
+    "build": "npm run build --prefix frontend",
+    "ci": "npm ci --prefix frontend",
+    "dev": "npm run dev --prefix frontend",
+    "preview": "npm run preview --prefix frontend"
+  }
+}

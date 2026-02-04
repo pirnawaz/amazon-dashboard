@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { restock, type RestockResponse, type RestockRow } from "./api";
+import { restock, type RestockResponse, type RestockRow, type RestockRiskLevel } from "./api";
 import { getDemoRestock } from "./data/demoData";
 import Card from "./components/ui/Card";
 import Table from "./components/ui/Table";
@@ -12,7 +12,7 @@ const DAYS_OPTIONS = [7, 30, 90] as const;
 const TARGET_DAYS_OPTIONS = [14, 30, 60] as const;
 const MARKETPLACE_OPTIONS = ["ALL", "US", "UK", "DE"] as const;
 
-function riskBadgeStyle(risk: string): React.CSSProperties {
+function riskBadgeStyle(risk: RestockRiskLevel): React.CSSProperties {
   if (risk === "CRITICAL")
     return {
       padding: "var(--space-1) var(--space-2)",

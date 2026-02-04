@@ -855,6 +855,8 @@ export interface RestockResponse {
   items: RestockRow[];
 }
 
+export type RestockRiskLevel = "CRITICAL" | "LOW" | "OK";
+
 export interface RestockRow {
   sku: string;
   title: string | null;
@@ -863,7 +865,7 @@ export interface RestockRow {
   avg_daily_units: number;
   days_of_cover: number;
   reorder_qty: number;
-  risk_level: string;
+  risk_level: RestockRiskLevel;
   inventory_source: string | null;
 }
 

@@ -1015,7 +1015,7 @@ export function getDemoHealthNotifications(limit = 20): NotificationDeliveryOut[
       notification_type: "stale_orders",
       severity: "warning",
       channel: "ui",
-      recipient: "admin",
+      recipient: "demo@example.com",
       subject: "Orders sync is stale",
       status: "sent",
       attempts: 1,
